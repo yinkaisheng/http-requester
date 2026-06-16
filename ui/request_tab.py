@@ -172,12 +172,13 @@ class RequestTab(QWidget):
 
         self.right_splitter = QSplitter(Qt.Vertical)
         self.response_headers_table = QTableWidget(0, 2)
+        self.response_headers_table.setObjectName('headerTable')
         self.response_headers_table.setHorizontalHeaderLabels(['Header', 'Value'])
         self.response_headers_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.response_headers_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.response_headers_table.verticalHeader().setVisible(False)
         self.response_headers_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        _set_compact_table_header(self.response_headers_table)
+        _set_compact_table_header(self.response_headers_table, header_table=True)
         attach_header_table_menu(self.response_headers_table, key_col=0, value_col=1)
 
         self.response_body_edit = QPlainTextEdit()

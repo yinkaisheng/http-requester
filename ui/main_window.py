@@ -23,8 +23,8 @@ from ui.request_tab_widget import RequestTabWidget
 
 
 class MainWindow(QMainWindow):
-    DEFAULT_WIDTH = 1200
-    DEFAULT_HEIGHT = 800
+    DEFAULT_WIDTH = 1600
+    DEFAULT_HEIGHT = 900
 
     def __init__(self):
         super().__init__()

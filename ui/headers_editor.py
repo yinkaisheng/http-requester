@@ -24,10 +24,16 @@ from PyQt5.QtWidgets import (
 
 from models.http_models import HeaderItem
 
-TABLE_HEADER_HEIGHT = 24
-HEADER_ROW_HEIGHT = 26
+TABLE_HEADER_HEIGHT = 22
+HEADER_ROW_HEIGHT = 24
+HEADER_TABLE_ROW_HEIGHT = HEADER_ROW_HEIGHT - 4
 TABLE_ROW_EXTRA_PADDING = 12
+HEADER_TABLE_ROW_EXTRA_PADDING = 6
+HEADER_TABLE_EDITABLE_MIN_HEIGHT = 24
 TABLE_FONT_DELTA_PX = 1
+HEADER_TABLE_FONT_DELTA_PX = 0
+TOGGLE_CELL_MARGIN_V = 1
+HEADER_TABLE_TOGGLE_SIZE = 16
 
 
 def format_header_line(key: str, value: str) -> str:
@@ -55,30 +61,34 @@ def parse_headers_text(text: str) -> List[Tuple[str, str]]:
     return rows
 
 
-def _apply_header_table_font(table: QTableWidget) -> None:
+def _apply_header_table_font(table: QTableWidget, *, header_table: bool = False) -> None:
     font = table.font()
+    delta = HEADER_TABLE_FONT_DELTA_PX if header_table else TABLE_FONT_DELTA_PX
     pixel_size = font.pixelSize()
     if pixel_size > 0:
-        font.setPixelSize(pixel_size + TABLE_FONT_DELTA_PX)
-    else:
-        font.setPointSize(font.pointSize() + 1)
+        font.setPixelSize(pixel_size + delta)
+    elif delta:
+        font.setPointSize(font.pointSize() + delta)
     table.setFont(font)
     table.horizontalHeader().setFont(font)
 
 
-def _table_row_height(table: QTableWidget, editable: bool = False) -> int:
+def _table_row_height(table: QTableWidget, editable: bool = False, *, header_table: bool = False) -> int:
     metrics = QFontMetrics(table.font())
-    base = metrics.height() + TABLE_ROW_EXTRA_PADDING
+    extra_padding = HEADER_TABLE_ROW_EXTRA_PADDING if header_table else TABLE_ROW_EXTRA_PADDING
+    min_height = HEADER_TABLE_ROW_HEIGHT if header_table else HEADER_ROW_HEIGHT
+    base = metrics.height() + extra_padding
     if editable:
-        return max(base, 30)
-    return max(base, HEADER_ROW_HEIGHT)
+        editable_min = HEADER_TABLE_EDITABLE_MIN_HEIGHT if header_table else 30
+        return max(base, editable_min)
+    return max(base, min_height)
 
 
-def _set_compact_table_header(table: QTableWidget, editable: bool = False) -> None:
-    _apply_header_table_font(table)
+def _set_compact_table_header(table: QTableWidget, editable: bool = False, *, header_table: bool = False) -> None:
+    _apply_header_table_font(table, header_table=header_table)
     h_header = table.horizontalHeader()
     h_header.setFixedHeight(TABLE_HEADER_HEIGHT)
-    row_height = _table_row_height(table, editable)
+    row_height = _table_row_height(table, editable, header_table=header_table)
     v_header = table.verticalHeader()
     v_header.setDefaultSectionSize(row_height)
     v_header.setMinimumSectionSize(row_height)
@@ -158,6 +168,12 @@ class TableEditDelegate(QStyledItemDelegate):
         editor.setGeometry(rect.adjusted(2, 2, -2, -2))
 
 
+class HeaderTableEditDelegate(TableEditDelegate):
+    def updateEditorGeometry(self, editor, option, index):
+        rect = option.rect
+        editor.setGeometry(rect.adjusted(2, 1, -2, -1))
+
+
 def fill_key_value_table(table: QTableWidget, headers: Dict[str, str]) -> None:
     items = list(headers.items())
     table.clearContents()
@@ -175,12 +191,19 @@ def fill_key_value_table(table: QTableWidget, headers: Dict[str, str]) -> None:
 class CheckMarkToggle(QPushButton):
     CHECK_MARK = '✓'
 
-    def __init__(self, checked: bool = True, parent: Optional[QWidget] = None):
+    def __init__(
+        self,
+        checked: bool = True,
+        parent: Optional[QWidget] = None,
+        *,
+        size: int = 18,
+    ):
         super().__init__(parent)
-        self.setObjectName('checkMarkToggle')
+        object_name = 'checkMarkToggleCompact' if size <= 16 else 'checkMarkToggle'
+        self.setObjectName(object_name)
         self.setCheckable(True)
         self.setChecked(checked)
-        self.setFixedSize(18, 18)
+        self.setFixedSize(size, size)
         self.setFocusPolicy(Qt.NoFocus)
         self._update_display()
         self.toggled.connect(self._update_display)
@@ -199,14 +222,15 @@ class RawHeadersEditor(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.table = QTableWidget(0, 3)
+        self.table.setObjectName('headerTable')
         self.table.setHorizontalHeaderLabels(['Enable', 'Header', 'Value'])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
-        _set_compact_table_header(self.table, editable=True)
-        self.table.setItemDelegateForColumn(1, TableEditDelegate(self.table))
-        self.table.setItemDelegateForColumn(2, TableEditDelegate(self.table))
+        _set_compact_table_header(self.table, editable=True, header_table=True)
+        self.table.setItemDelegateForColumn(1, HeaderTableEditDelegate(self.table))
+        self.table.setItemDelegateForColumn(2, HeaderTableEditDelegate(self.table))
         attach_header_table_menu(
             self.table,
             key_col=1,
@@ -234,14 +258,17 @@ class RawHeadersEditor(QWidget):
     def _add_row(self, item: Optional[HeaderItem] = None) -> None:
         row = self.table.rowCount()
         self.table.insertRow(row)
-        self.table.setRowHeight(row, _table_row_height(self.table, editable=True))
+        self.table.setRowHeight(row, _table_row_height(self.table, editable=True, header_table=True))
 
-        toggle = CheckMarkToggle(item.enabled if item else True)
+        toggle = CheckMarkToggle(
+            item.enabled if item else True,
+            size=HEADER_TABLE_TOGGLE_SIZE,
+        )
         toggle_widget = QWidget()
         toggle_layout = QHBoxLayout(toggle_widget)
         toggle_layout.addWidget(toggle)
         toggle_layout.setAlignment(Qt.AlignCenter)
-        toggle_layout.setContentsMargins(0, 3, 0, 3)
+        toggle_layout.setContentsMargins(0, TOGGLE_CELL_MARGIN_V, 0, TOGGLE_CELL_MARGIN_V)
         self.table.setCellWidget(row, 0, toggle_widget)
 
         key_item = QTableWidgetItem(item.key if item else '')
@@ -330,12 +357,13 @@ class SentHeadersView(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.table = QTableWidget(0, 2)
+        self.table.setObjectName('headerTable')
         self.table.setHorizontalHeaderLabels(['Header', 'Value'])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        _set_compact_table_header(self.table)
+        _set_compact_table_header(self.table, header_table=True)
         attach_header_table_menu(self.table, key_col=0, value_col=1)
         layout.addWidget(self.table)
 

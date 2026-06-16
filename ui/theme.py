@@ -298,6 +298,10 @@ QTableWidget::item {{
     padding: 2px 4px;
 }}
 
+QTableWidget#headerTable::item {{
+    padding: 1px 4px;
+}}
+
 QTableWidget QLineEdit#tableCellEditor {{
     padding: 0px 4px;
     margin: 0px;
@@ -401,6 +405,36 @@ QPushButton#checkMarkToggle:checked {{
 }}
 
 QPushButton#checkMarkToggle:checked:hover {{
+    background-color: #2f9ee0;
+    border-color: #2f9ee0;
+}}
+
+QPushButton#checkMarkToggleCompact {{
+    background-color: {SOL_BASE3};
+    border: 1px solid {SOL_BASE1};
+    border-radius: 3px;
+    color: transparent;
+    font-weight: bold;
+    font-size: {max(size_px - 4, 10)}px;
+    padding: 0;
+    min-width: 16px;
+    max-width: 16px;
+    min-height: 16px;
+    max-height: 16px;
+}}
+
+QPushButton#checkMarkToggleCompact:hover {{
+    border-color: {SOL_BASE0};
+    background-color: #faf4e6;
+}}
+
+QPushButton#checkMarkToggleCompact:checked {{
+    background-color: {SOL_BLUE};
+    border-color: {SOL_BLUE};
+    color: {SOL_BASE3};
+}}
+
+QPushButton#checkMarkToggleCompact:checked:hover {{
     background-color: #2f9ee0;
     border-color: #2f9ee0;
 }}
