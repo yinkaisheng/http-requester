@@ -32,17 +32,12 @@ I wanted a simple tool to send and inspect HTTP requests without installing the 
 ## Installation
 
 ```bash
-git clone <repository-url>
-cd http-requester
-
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS / Linux
-source .venv/bin/activate
-
 pip install -r requirements.txt
 ```
+
+## Portable release (Windows)
+
+Each release includes a portable **~18 MB** 7z archive for **Windows 7** and later. The package bundles a self-contained **Python 3.11** runtime and all required libraries, so you can extract it and run `HttpRequester.exe` without installing Python or running `pip` on your system.
 
 ## Usage
 
