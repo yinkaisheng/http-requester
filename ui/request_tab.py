@@ -42,6 +42,14 @@ DEFAULT_PANEL_RATIO = (1, 3)
 STATUS_DISPLAY_MAX_LENGTH = 72
 
 
+def _status_code_style_id(status_code: int) -> str:
+    if 200 <= status_code < 300:
+        return 'statusOk'
+    if status_code < 500:
+        return 'statusWarn'
+    return 'statusError'
+
+
 def _truncate_status_text(text: str, max_length: int = STATUS_DISPLAY_MAX_LENGTH) -> tuple[str, str]:
     full = text.strip()
     if len(full) <= max_length:
@@ -426,12 +434,7 @@ class RequestTab(QWidget):
             self.response_body_edit.setPlainText('')
             return
 
-        if 200 <= resp.status_code < 300:
-            style_id = 'statusOk'
-        elif resp.status_code < 500:
-            style_id = 'statusWarn'
-        else:
-            style_id = 'statusError'
+        style_id = _status_code_style_id(resp.status_code)
         self._set_status_text(
             f'{resp.status_code} {resp.reason} · {resp.elapsed_ms:.0f} ms'
         )
@@ -463,12 +466,7 @@ class RequestTab(QWidget):
             return
 
         if status_code is not None:
-            if 200 <= status_code < 300:
-                style_id = 'statusOk'
-            elif status_code < 500:
-                style_id = 'statusWarn'
-            else:
-                style_id = 'statusError'
+            style_id = _status_code_style_id(status_code)
             if elapsed_ms is not None:
                 status_text = f'{status_code} {reason} · {elapsed_ms:.0f} ms'.strip()
             else:

@@ -16,27 +16,34 @@ class HistoryStore:
         if path is None:
             path = HISTORY_FILE
         self.path = path
+        self._cache: Optional[List[HistoryRecord]] = None
 
     def _ensure_dir(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def load(self) -> List[HistoryRecord]:
+        if self._cache is not None:
+            return self._cache
         if not self.path.exists():
-            return []
+            self._cache = []
+            return self._cache
         try:
             with open(self.path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
         except (json.JSONDecodeError, OSError):
-            return []
+            self._cache = []
+            return self._cache
         records = [HistoryRecord.from_dict(item) for item in data.get('records', [])]
         records.sort(key=lambda r: r.updated_at, reverse=True)
-        return records
+        self._cache = records
+        return self._cache
 
     def _save_all(self, records: List[HistoryRecord]) -> None:
         self._ensure_dir()
         payload = {'records': [r.to_dict() for r in records]}
         with open(self.path, 'w', encoding='utf-8') as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
+        self._cache = records
 
     def upsert(self, record: HistoryRecord) -> None:
         records = self.load()

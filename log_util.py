@@ -279,6 +279,7 @@ def remove_color_of_shell_text(stdout: str) -> str:
 
 
 def printx(*values, prefix: Any = '', print_id: bool = False, sep: str = ' ', end: str = None, caller: bool = True, flush: bool = False) -> None:
+    '''values must be variables that have name, like: name = value, not literal or expression like: 1 + 2, etc.'''
     now = datetime.now()
     if caller:
         frame = sys._getframe(1)

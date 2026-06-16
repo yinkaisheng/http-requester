@@ -14,24 +14,30 @@ class SessionStore:
         if path is None:
             path = SESSION_FILE
         self.path = path
+        self._cache: Optional[Dict[str, Any]] = None
 
     def _ensure_dir(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def load(self) -> Dict[str, Any]:
+        if self._cache is not None:
+            return self._cache
         if not self.path.exists():
-            return {}
+            self._cache = {}
+            return self._cache
         try:
             with open(self.path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            return data if isinstance(data, dict) else {}
+            self._cache = data if isinstance(data, dict) else {}
         except (json.JSONDecodeError, OSError):
-            return {}
+            self._cache = {}
+        return self._cache
 
     def save(self, session: Dict[str, Any]) -> None:
         self._ensure_dir()
         with open(self.path, 'w', encoding='utf-8') as f:
             json.dump(session, f, ensure_ascii=False, indent=2)
+        self._cache = session
 
     def get_window_size(self) -> Optional[List[int]]:
         window = self.load().get('window', {})

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtWidgets import QPushButton, QTabWidget, QWidget
+from PyQt5.QtWidgets import QTabWidget, QWidget
 
 from models.http_models import HistoryRecord
 from pyqt_async_task import AsyncTask
@@ -28,30 +28,11 @@ class RequestTabWidget(QTabWidget):
         self.history_store = history_store
         self.async_task = async_task
         self._record_tab_map: Dict[str, int] = {}
-        self.setTabsClosable(False)
+        self.setTabsClosable(True)
         self.setMovable(True)
+        self.tabCloseRequested.connect(self._close_tab_at_index)
+        self.tabBar().tabMoved.connect(self._rebuild_map)
         self.tabBarDoubleClicked.connect(self._on_tab_bar_double_clicked)
-
-    def addTab(self, widget: QWidget, label: str) -> int:
-        index = super().addTab(widget, label)
-        self._install_tab_close_button(index)
-        return index
-
-    def _install_tab_close_button(self, index: int) -> None:
-        close_btn = QPushButton('×')
-        close_btn.setObjectName('tabCloseButton')
-        close_btn.setFixedSize(18, 18)
-        close_btn.setToolTip('Close')
-        tab_widget = self.widget(index)
-        close_btn.clicked.connect(
-            lambda _=False, widget=tab_widget: self._close_tab_widget(widget)
-        )
-        self.tabBar().setTabButton(index, self.tabBar().RightSide, close_btn)
-
-    def _close_tab_widget(self, widget: QWidget) -> None:
-        index = self.indexOf(widget)
-        if index >= 0:
-            self._close_tab_at_index(index)
 
     def open_record(self, record: HistoryRecord) -> None:
         if record.id in self._record_tab_map:
@@ -144,8 +125,6 @@ class RequestTabWidget(QTabWidget):
                 del self._record_tab_map[record_id]
         self.removeTab(index)
         self._rebuild_map()
-        for i in range(self.count()):
-            self._install_tab_close_button(i)
         self._ensure_at_least_one_tab()
 
     def _on_tab_bar_double_clicked(self, index: int) -> None:

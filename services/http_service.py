@@ -81,8 +81,10 @@ def send_request(req: HttpRequest) -> HttpResponse:
     opened_files = []
     if files:
         for value in files.values():
-            if hasattr(value, 'read'):
-                opened_files.append(value[1] if isinstance(value, tuple) else value)
+            if isinstance(value, tuple):
+                opened_files.append(value[1])
+            else:
+                opened_files.append(value)
 
     timeout = req.timeout_seconds if req.timeout_seconds > 0 else DEFAULT_REQUEST_TIMEOUT_SECONDS
 

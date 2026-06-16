@@ -8,6 +8,8 @@ from log_util import Fore, log, current_thread_id
 
 
 MsgIDThreadExit = 0
+# QThread.wait() default timeout (ULONG_MAX); PyQt5 has no QThread.WaitForever.
+_WAIT_FOREVER_MS = 0xFFFFFFFF
 logfunc = log
 
 
@@ -133,7 +135,7 @@ class AsyncTask():
         thread.start()
         return self.taskId
 
-    def waitTask(self, taskId: int, msecs: int = 0xFFFFFFFF) -> bool:
+    def waitTask(self, taskId: int, msecs: int = _WAIT_FOREVER_MS) -> bool:
         if taskId in self.taskThreads:
             return self.taskThreads[taskId].wait(msecs)
         return False
