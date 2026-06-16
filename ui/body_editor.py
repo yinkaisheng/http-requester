@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
 )
 
 from models.http_models import BodyType, FormField
-from ui.headers_editor import HEADER_ROW_HEIGHT, TableEditDelegate, _set_compact_table_header, _table_row_height
+from ui.headers_editor import HEADER_ROW_HEIGHT, TableEditDelegate, _compact_action_button, _set_compact_table_header, _table_row_height
 
 FORM_CELL_MARGIN_V = 2
 FORM_CELL_MARGIN_H = 4
@@ -40,14 +40,13 @@ class BodyEditor(QWidget):
         layout.setSpacing(4)
 
         self.type_group = QButtonGroup(self)
-        self.radio_none = QRadioButton('None')
         self.radio_raw = QRadioButton('Raw')
         self.radio_json = QRadioButton('JSON')
         self.radio_form = QRadioButton('Form Data')
         self.radio_file = QRadioButton('File Upload')
-        self.radio_none.setChecked(True)
+        self.radio_raw.setChecked(True)
         for i, radio in enumerate([
-            self.radio_none, self.radio_raw, self.radio_json,
+            self.radio_raw, self.radio_json,
             self.radio_form, self.radio_file,
         ]):
             self.type_group.addButton(radio, i)
@@ -75,7 +74,7 @@ class BodyEditor(QWidget):
         title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         header_layout.addWidget(title)
         for radio in (
-            self.radio_none, self.radio_raw, self.radio_json,
+            self.radio_raw, self.radio_json,
             self.radio_form, self.radio_file,
         ):
             header_layout.addWidget(radio)
@@ -117,10 +116,8 @@ class BodyEditor(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 2, 0, 0)
         btn_layout.setSpacing(6)
-        add_btn = QPushButton('+ Add')
-        remove_btn = QPushButton('- Remove')
-        add_btn.setObjectName('compactButton')
-        remove_btn.setObjectName('compactButton')
+        add_btn = _compact_action_button('+ Add')
+        remove_btn = _compact_action_button('- Remove')
         add_btn.clicked.connect(self._add_form_row)
         remove_btn.clicked.connect(self._remove_form_rows)
         btn_layout.addWidget(add_btn)
@@ -142,8 +139,8 @@ class BodyEditor(QWidget):
         self.file_path_edit.setReadOnly(True)
         self.file_path_edit.setPlaceholderText('Select a file to upload')
         browse_btn = QPushButton('Select File')
-        browse_btn.setObjectName('compactButton')
         browse_btn.clicked.connect(self._browse_single_file)
+        browse_btn.setFixedHeight(self.file_path_edit.sizeHint().height())
         file_layout.addWidget(self.file_path_edit)
         file_layout.addWidget(browse_btn)
         page_layout.addLayout(file_layout)
@@ -154,9 +151,9 @@ class BodyEditor(QWidget):
         btn_id = self.type_group.checkedId()
         if btn_id <= 1:
             self.stack.setCurrentIndex(0)
-        elif btn_id == 3:
+        elif btn_id == 2:
             self.stack.setCurrentIndex(1)
-        elif btn_id == 4:
+        elif btn_id == 3:
             self.stack.setCurrentIndex(2)
         else:
             self.stack.setCurrentIndex(0)
@@ -266,13 +263,12 @@ class BodyEditor(QWidget):
 
     def get_body_type(self) -> BodyType:
         mapping = {
-            0: BodyType.NONE,
-            1: BodyType.RAW,
-            2: BodyType.JSON,
-            3: BodyType.FORM,
-            4: BodyType.FILE,
+            0: BodyType.RAW,
+            1: BodyType.JSON,
+            2: BodyType.FORM,
+            3: BodyType.FILE,
         }
-        return mapping.get(self.type_group.checkedId(), BodyType.NONE)
+        return mapping.get(self.type_group.checkedId(), BodyType.RAW)
 
     def get_body_text(self) -> str:
         return self.text_edit.toPlainText()
@@ -302,13 +298,13 @@ class BodyEditor(QWidget):
         file_path: str = '',
     ) -> None:
         radio_map = {
-            BodyType.NONE: self.radio_none,
+            BodyType.NONE: self.radio_raw,
             BodyType.RAW: self.radio_raw,
             BodyType.JSON: self.radio_json,
             BodyType.FORM: self.radio_form,
             BodyType.FILE: self.radio_file,
         }
-        radio = radio_map.get(body_type, self.radio_none)
+        radio = radio_map.get(body_type, self.radio_raw)
         radio.setChecked(True)
         self._on_type_changed()
 

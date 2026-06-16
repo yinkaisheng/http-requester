@@ -73,7 +73,7 @@ class HttpRequest:
     method: str = 'GET'
     url: str = ''
     headers: List[HeaderItem] = field(default_factory=list)
-    body_type: BodyType = BodyType.NONE
+    body_type: BodyType = BodyType.RAW
     body_text: str = ''
     form_fields: List[FormField] = field(default_factory=list)
     file_path: str = ''
@@ -106,7 +106,7 @@ class HttpRequest:
             method=data.get('method', 'GET'),
             url=data.get('url', ''),
             headers=[HeaderItem.from_dict(h) for h in data.get('headers', [])],
-            body_type=BodyType(data.get('body_type', BodyType.NONE.value)),
+            body_type=BodyType(data.get('body_type', BodyType.RAW.value)),
             body_text=data.get('body_text', ''),
             form_fields=[FormField.from_dict(f) for f in data.get('form_fields', [])],
             file_path=data.get('file_path', ''),

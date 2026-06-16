@@ -7,6 +7,7 @@ from typing import Optional
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QApplication,
+    QComboBox,
     QHBoxLayout,
     QMainWindow,
     QPushButton,
@@ -20,6 +21,12 @@ from storage.history_store import HistoryStore
 from storage.session_store import SessionStore
 from ui.history_panel import HistoryPanel
 from ui.request_tab_widget import RequestTabWidget
+from ui.theme import (
+    THEME_LABELS,
+    THEME_OPTIONS,
+    apply_app_theme,
+    normalize_theme_name,
+)
 
 
 class MainWindow(QMainWindow):
@@ -51,6 +58,14 @@ class MainWindow(QMainWindow):
         self.new_btn.setObjectName('primaryButton')
         self.new_btn.clicked.connect(self._on_new_request)
         top_layout.addWidget(self.new_btn)
+
+        self.theme_combo = QComboBox()
+        self.theme_combo.setObjectName('themeCombo')
+        self.theme_combo.setFixedWidth(88)
+        for theme_name in THEME_OPTIONS:
+            self.theme_combo.addItem(THEME_LABELS[theme_name], theme_name)
+        self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
+        top_layout.addWidget(self.theme_combo)
         top_layout.addStretch()
 
         self._main_splitter = QSplitter(Qt.Horizontal)
@@ -80,6 +95,13 @@ class MainWindow(QMainWindow):
     def _restore_session(self) -> None:
         session = self.session_store.load()
         window = session.get('window', {})
+
+        theme = normalize_theme_name(session.get('theme'))
+        theme_index = THEME_OPTIONS.index(theme)
+        self.theme_combo.blockSignals(True)
+        self.theme_combo.setCurrentIndex(theme_index)
+        self.theme_combo.blockSignals(False)
+        apply_app_theme(QApplication.instance(), theme)
 
         width = window.get('width', self.DEFAULT_WIDTH)
         height = window.get('height', self.DEFAULT_HEIGHT)
@@ -118,6 +140,7 @@ class MainWindow(QMainWindow):
             'main_splitter': self._main_splitter.sizes() if self._main_splitter else [280, 920],
         }
         self.session_store.save({
+            'theme': self._current_theme(),
             'window': window_state,
             'tabs': tab_state.get('tabs', []),
             'current_tab_index': tab_state.get('current_tab_index', 0),
@@ -129,6 +152,16 @@ class MainWindow(QMainWindow):
 
     def _on_new_request(self) -> None:
         self.request_tabs.new_request()
+
+    def _current_theme(self) -> str:
+        return normalize_theme_name(self.theme_combo.currentData())
+
+    def _on_theme_changed(self, _index: int) -> None:
+        app = QApplication.instance()
+        if app is None:
+            return
+        apply_app_theme(app, self._current_theme())
+        self._save_session()
 
     def _on_record_selected(self, record_id: str) -> None:
         record = self.history_panel.get_record(record_id)

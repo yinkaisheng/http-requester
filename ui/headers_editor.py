@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMenu,
     QPushButton,
+    QSizePolicy,
     QStackedWidget,
     QStyledItemDelegate,
     QTableWidget,
@@ -34,6 +35,14 @@ TABLE_FONT_DELTA_PX = 1
 HEADER_TABLE_FONT_DELTA_PX = 0
 TOGGLE_CELL_MARGIN_V = 1
 HEADER_TABLE_TOGGLE_SIZE = 16
+
+
+def _compact_action_button(text: str) -> QPushButton:
+    btn = QPushButton(text)
+    btn.setObjectName('compactButton')
+    btn.ensurePolished()
+    btn.setMinimumHeight(btn.sizeHint().height())
+    return btn
 
 
 def format_header_line(key: str, value: str) -> str:
@@ -228,6 +237,7 @@ class RawHeadersEditor(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
+        self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         _set_compact_table_header(self.table, editable=True, header_table=True)
         self.table.setItemDelegateForColumn(1, HeaderTableEditDelegate(self.table))
         self.table.setItemDelegateForColumn(2, HeaderTableEditDelegate(self.table))
@@ -237,21 +247,18 @@ class RawHeadersEditor(QWidget):
             value_col=2,
             paste_callback=self._paste_headers,
         )
-        layout.addWidget(self.table)
-
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 2, 0, 0)
         btn_layout.setSpacing(6)
-        self.add_btn = QPushButton('+ Add')
-        self.remove_btn = QPushButton('- Remove')
-        self.add_btn.setObjectName('compactButton')
-        self.remove_btn.setObjectName('compactButton')
+        self.add_btn = _compact_action_button('+ Add')
+        self.remove_btn = _compact_action_button('- Remove')
         self.add_btn.clicked.connect(self._add_row)
         self.remove_btn.clicked.connect(self._remove_selected_rows)
         btn_layout.addWidget(self.add_btn)
         btn_layout.addWidget(self.remove_btn)
         btn_layout.addStretch()
-        layout.addLayout(btn_layout)
+        layout.addWidget(self.table, 1)
+        layout.addLayout(btn_layout, 0)
 
         self._add_row()
 

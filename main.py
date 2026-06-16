@@ -6,9 +6,14 @@ from pathlib import Path
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QStyleFactory
 
+hpath = Path(__file__).resolve().parent / 'Lib' / 'http-requester'
+sys.path.append(str(hpath))
+# print(f"Added {hpath} to sys.path")
+
 from log_util import config_logger, logger
+from storage.session_store import SessionStore
 from ui.main_window import MainWindow
-from ui.theme import apply_app_theme
+from ui.theme import apply_app_font, apply_app_theme, normalize_theme_name
 
 APP_ICON_PATH = Path(__file__).resolve().parent / 'web.ico'
 
@@ -27,7 +32,9 @@ def main():
     icon = _load_app_icon()
     if not icon.isNull():
         app.setWindowIcon(icon)
-    apply_app_theme(app)
+    session = SessionStore().load()
+    apply_app_font(app)
+    apply_app_theme(app, normalize_theme_name(session.get('theme')))
     window = MainWindow()
     if not icon.isNull():
         window.setWindowIcon(icon)
