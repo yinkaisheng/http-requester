@@ -18,6 +18,7 @@ class BodyType(str, Enum):
 
 
 HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 30
 
 
 def _now_iso() -> str:
@@ -77,6 +78,7 @@ class HttpRequest:
     form_fields: List[FormField] = field(default_factory=list)
     file_path: str = ''
     ssl_verify: bool = False
+    timeout_seconds: int = DEFAULT_REQUEST_TIMEOUT_SECONDS
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -88,10 +90,18 @@ class HttpRequest:
             'form_fields': [f.to_dict() for f in self.form_fields],
             'file_path': self.file_path,
             'ssl_verify': self.ssl_verify,
+            'timeout_seconds': self.timeout_seconds,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'HttpRequest':
+        timeout = data.get('timeout_seconds', DEFAULT_REQUEST_TIMEOUT_SECONDS)
+        try:
+            timeout = int(timeout)
+        except (TypeError, ValueError):
+            timeout = DEFAULT_REQUEST_TIMEOUT_SECONDS
+        if timeout <= 0:
+            timeout = DEFAULT_REQUEST_TIMEOUT_SECONDS
         return cls(
             method=data.get('method', 'GET'),
             url=data.get('url', ''),
@@ -101,6 +111,7 @@ class HttpRequest:
             form_fields=[FormField.from_dict(f) for f in data.get('form_fields', [])],
             file_path=data.get('file_path', ''),
             ssl_verify=data.get('ssl_verify', False),
+            timeout_seconds=timeout,
         )
 
 

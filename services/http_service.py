@@ -8,9 +8,7 @@ from typing import Dict, Optional, Tuple, Union
 
 import requests
 
-from models.http_models import BodyType, HttpRequest, HttpResponse
-
-TIMEOUT_SECONDS = 30
+from models.http_models import BodyType, DEFAULT_REQUEST_TIMEOUT_SECONDS, HttpRequest, HttpResponse
 
 
 def _enabled_headers(req: HttpRequest) -> Dict[str, str]:
@@ -86,6 +84,8 @@ def send_request(req: HttpRequest) -> HttpResponse:
             if hasattr(value, 'read'):
                 opened_files.append(value[1] if isinstance(value, tuple) else value)
 
+    timeout = req.timeout_seconds if req.timeout_seconds > 0 else DEFAULT_REQUEST_TIMEOUT_SECONDS
+
     try:
         response = requests.request(
             method=method,
@@ -94,7 +94,7 @@ def send_request(req: HttpRequest) -> HttpResponse:
             data=data,
             json=json_body,
             files=files,
-            timeout=TIMEOUT_SECONDS,
+            timeout=timeout,
             allow_redirects=True,
             verify=req.ssl_verify,
         )

@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
+    QSpinBox,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -23,7 +24,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from models.http_models import HTTP_METHODS, HistoryRecord, HttpRequest, HttpResponse
+from models.http_models import DEFAULT_REQUEST_TIMEOUT_SECONDS, HTTP_METHODS, HistoryRecord, HttpRequest, HttpResponse
 from pyqt_async_task import AsyncTask, MsgIDThreadExit
 from services.http_service import send_request
 from storage.history_store import HistoryStore
@@ -127,6 +128,19 @@ class RequestTab(QWidget):
         ssl_verify_layout.addWidget(ssl_verify_label)
         self.url_edit = QLineEdit()
         self.url_edit.setPlaceholderText('https://api.example.com/path')
+        timeout_row = QWidget()
+        timeout_layout = QHBoxLayout(timeout_row)
+        timeout_layout.setContentsMargins(0, 0, 0, 0)
+        timeout_layout.setSpacing(4)
+        timeout_label = QLabel('Timeout')
+        timeout_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        self.timeout_spin = QSpinBox()
+        self.timeout_spin.setRange(1, 3600)
+        self.timeout_spin.setValue(DEFAULT_REQUEST_TIMEOUT_SECONDS)
+        self.timeout_spin.setSuffix('s')
+        self.timeout_spin.setFixedWidth(72)
+        timeout_layout.addWidget(timeout_label)
+        timeout_layout.addWidget(self.timeout_spin)
         self.send_btn = QPushButton('Send')
         self.send_btn.setObjectName('primaryButton')
         self.send_btn.setFixedWidth(80)
@@ -134,6 +148,7 @@ class RequestTab(QWidget):
         toolbar.addWidget(self.method_combo)
         toolbar.addWidget(ssl_verify_row)
         toolbar.addWidget(self.url_edit, 1)
+        toolbar.addWidget(timeout_row)
         toolbar.addWidget(self.send_btn)
         layout.addLayout(toolbar)
 
@@ -283,6 +298,7 @@ class RequestTab(QWidget):
             self.method_combo.setCurrentIndex(idx)
         self.url_edit.setText(req.url)
         self.ssl_verify_check.setChecked(req.ssl_verify)
+        self.timeout_spin.setValue(req.timeout_seconds)
         self.headers_panel.set_raw_headers(req.headers)
         self.headers_panel.set_sent_headers(sent_headers or {})
         self.headers_panel.show_raw_mode()
@@ -303,6 +319,7 @@ class RequestTab(QWidget):
             form_fields=self.body_editor.get_form_fields(),
             file_path=self.body_editor.get_file_path(),
             ssl_verify=self.ssl_verify_check.isChecked(),
+            timeout_seconds=self.timeout_spin.value(),
         )
 
     def get_session_state(self) -> dict:
