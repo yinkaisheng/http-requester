@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import sys
+from pathlib import Path
+
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QApplication, QStyleFactory
+
+from log_util import config_logger, logger
+from ui.main_window import MainWindow
+from ui.theme import apply_app_theme
+
+APP_ICON_PATH = Path(__file__).resolve().parent / 'web.ico'
+
+
+def _load_app_icon() -> QIcon:
+    if APP_ICON_PATH.is_file():
+        return QIcon(str(APP_ICON_PATH))
+    return QIcon()
+
+
+def main():
+    config_logger(logger, log_to_stdout=False)
+    app = QApplication(sys.argv)
+    app.setStyle(QStyleFactory.create('Fusion'))
+    app.setApplicationName('HTTP Requester')
+    icon = _load_app_icon()
+    if not icon.isNull():
+        app.setWindowIcon(icon)
+    apply_app_theme(app)
+    window = MainWindow()
+    if not icon.isNull():
+        window.setWindowIcon(icon)
+    window.show()
+    sys.exit(app.exec_())
+
+
+if __name__ == '__main__':
+    main()
