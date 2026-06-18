@@ -140,7 +140,6 @@ class BodyEditor(QWidget):
         self.file_path_edit.setPlaceholderText('Select a file to upload')
         browse_btn = QPushButton('Select File')
         browse_btn.clicked.connect(self._browse_single_file)
-        browse_btn.setFixedHeight(self.file_path_edit.sizeHint().height())
         file_layout.addWidget(self.file_path_edit)
         file_layout.addWidget(browse_btn)
         page_layout.addLayout(file_layout)
