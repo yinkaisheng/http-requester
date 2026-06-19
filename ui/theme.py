@@ -23,14 +23,17 @@ BODY_TEXT_FONT_DELTA_PX = 4
 BODY_TEXT_FONT_FAMILY_WIN = 'Consolas'
 BODY_TEXT_FONT_FALLBACKS = ('Cascadia Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace')
 
-ThemeName = Literal['light', 'dark']
+ThemeName = Literal['solarized', 'light', 'dark']
+THEME_SOLARIZED: ThemeName = 'solarized'
 THEME_LIGHT: ThemeName = 'light'
 THEME_DARK: ThemeName = 'dark'
 THEME_LABELS: Dict[ThemeName, str] = {
+    THEME_SOLARIZED: 'Solarized Light',
     THEME_LIGHT: 'Light',
     THEME_DARK: 'Dark',
 }
-THEME_OPTIONS = [THEME_LIGHT, THEME_DARK]
+THEME_OPTIONS = [THEME_SOLARIZED, THEME_LIGHT, THEME_DARK]
+CURRENT_THEME_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -57,7 +60,7 @@ class ThemePalette:
     gridline: str
 
 
-LIGHT_PALETTE = ThemePalette(
+SOLARIZED_LIGHT_PALETTE = ThemePalette(
     window_bg='#fdf6e3',
     window_fg='#657b83',
     surface='#eee8d5',
@@ -78,6 +81,29 @@ LIGHT_PALETTE = ThemePalette(
     warning=SOL_ORANGE,
     pending='#586e75',
     gridline='#eee8d5',
+)
+
+WHITE_LIGHT_PALETTE = ThemePalette(
+    window_bg='#fafafa',
+    window_fg='#333333',
+    surface='#f0f0f0',
+    surface_alt='#f5f5f5',
+    border='#e0e0e0',
+    border_strong='#c8c8c8',
+    text_muted='#555555',
+    text_subtle='#777777',
+    hover_bg='#eeeeee',
+    hover_bg_soft='#f5f5f5',
+    hover_bg_toggle='#f0f0f0',
+    accent=SOL_BLUE,
+    accent_hover='#2f9ee0',
+    accent_pressed='#1f7bb8',
+    on_accent='#ffffff',
+    error=SOL_RED,
+    success=SOL_GREEN,
+    warning=SOL_ORANGE,
+    pending='#666666',
+    gridline='#eeeeee',
 )
 
 DARK_PALETTE = ThemePalette(
@@ -104,15 +130,28 @@ DARK_PALETTE = ThemePalette(
 )
 
 THEME_PALETTES: Dict[ThemeName, ThemePalette] = {
-    THEME_LIGHT: LIGHT_PALETTE,
+    THEME_SOLARIZED: SOLARIZED_LIGHT_PALETTE,
+    THEME_LIGHT: WHITE_LIGHT_PALETTE,
     THEME_DARK: DARK_PALETTE,
 }
+
+
+def migrate_session_theme(theme: str | None, theme_version: int | None) -> str | None:
+    """Map legacy session values before multi-light themes were introduced."""
+    if theme_version is None or theme_version < CURRENT_THEME_VERSION:
+        if theme == 'light':
+            return THEME_SOLARIZED
+    return theme
 
 
 def normalize_theme_name(theme: str | None) -> ThemeName:
     if theme == THEME_DARK:
         return THEME_DARK
-    return THEME_LIGHT
+    if theme == THEME_LIGHT:
+        return THEME_LIGHT
+    if theme == THEME_SOLARIZED:
+        return THEME_SOLARIZED
+    return THEME_SOLARIZED
 
 
 def _body_text_font_family() -> str:
@@ -132,7 +171,7 @@ def apply_app_font(app: QApplication) -> None:
     app.setFont(base_font)
 
 
-def apply_app_theme(app: QApplication, theme: str | None = THEME_LIGHT) -> None:
+def apply_app_theme(app: QApplication, theme: str | None = THEME_SOLARIZED) -> None:
     palette = THEME_PALETTES[normalize_theme_name(theme)]
     app.setStyleSheet(_build_stylesheet(app.font(), palette))
 
@@ -218,16 +257,11 @@ QTabBar::tab:hover:!selected {{
 }}
 
 QTabBar::close-button {{
-    subcontrol-origin: padding;
-    subcontrol-position: right;
-    width: 16px;
-    height: 16px;
-    margin: 2px;
-    border-radius: 3px;
-}}
-
-QTabBar::close-button:hover {{
-    background-color: {p.error};
+    width: 0;
+    height: 0;
+    margin: 0;
+    border: none;
+    image: none;
 }}
 
 QLabel#sectionTitle {{
@@ -286,6 +320,8 @@ QPushButton#tabCloseButton {{
     min-height: 18px;
     max-height: 18px;
     border-radius: 3px;
+    font-size: {max(size_px + 1, 12)}px;
+    font-weight: bold;
 }}
 
 QPushButton#tabCloseButton:hover {{
@@ -362,6 +398,7 @@ QComboBox, QSpinBox {{
     border: 1px solid {p.border};
     border-radius: 4px;
     padding: 4px 8px;
+    font-size: {size_px}px;
     selection-background-color: {p.accent};
     selection-color: {p.on_accent};
 }}
@@ -436,6 +473,13 @@ QComboBox QAbstractItemView {{
     border: 1px solid {p.border};
     selection-background-color: {p.surface};
     selection-color: {p.window_fg};
+    font-size: {size_px}px;
+    outline: none;
+}}
+
+QComboBox QAbstractItemView::item {{
+    min-height: {max(size_px + 8, 22)}px;
+    padding: 4px 8px;
 }}
 
 QTableWidget, QTableView {{

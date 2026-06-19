@@ -79,6 +79,12 @@ def _paint_triangle(
 class ArrowComboBox(QComboBox):
     """Paint a dropdown glyph after the style pass; Fusion+QSS often hides native arrows."""
 
+    def showPopup(self) -> None:
+        view = self.view()
+        if view is not None:
+            view.setFont(self.font())
+        super().showPopup()
+
     def paintEvent(self, event) -> None:
         super().paintEvent(event)
         opt = QStyleOptionComboBox()

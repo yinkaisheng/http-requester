@@ -13,7 +13,12 @@ sys.path.append(str(hpath))
 from log_util import config_logger, logger
 from storage.session_store import SessionStore
 from ui.main_window import MainWindow
-from ui.theme import apply_app_font, apply_app_theme, normalize_theme_name
+from ui.theme import (
+    apply_app_font,
+    apply_app_theme,
+    migrate_session_theme,
+    normalize_theme_name,
+)
 
 APP_ICON_PATH = Path(__file__).resolve().parent / 'web.ico'
 
@@ -33,8 +38,11 @@ def main():
     if not icon.isNull():
         app.setWindowIcon(icon)
     session = SessionStore().load()
+    theme = normalize_theme_name(
+        migrate_session_theme(session.get('theme'), session.get('theme_version'))
+    )
     apply_app_font(app)
-    apply_app_theme(app, normalize_theme_name(session.get('theme')))
+    apply_app_theme(app, theme)
     window = MainWindow()
     if not icon.isNull():
         window.setWindowIcon(icon)

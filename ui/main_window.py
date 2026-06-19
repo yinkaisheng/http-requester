@@ -21,9 +21,11 @@ from storage.session_store import SessionStore
 from ui.history_panel import HistoryPanel
 from ui.request_tab_widget import RequestTabWidget
 from ui.theme import (
+    CURRENT_THEME_VERSION,
     THEME_LABELS,
     THEME_OPTIONS,
     apply_app_theme,
+    migrate_session_theme,
     normalize_theme_name,
 )
 from ui.widgets import ArrowComboBox
@@ -61,7 +63,7 @@ class MainWindow(QMainWindow):
 
         self.theme_combo = ArrowComboBox()
         self.theme_combo.setObjectName('themeCombo')
-        self.theme_combo.setFixedWidth(88)
+        self.theme_combo.setMinimumWidth(130)
         for theme_name in THEME_OPTIONS:
             self.theme_combo.addItem(THEME_LABELS[theme_name], theme_name)
         self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
@@ -96,7 +98,9 @@ class MainWindow(QMainWindow):
         session = self.session_store.load()
         window = session.get('window', {})
 
-        theme = normalize_theme_name(session.get('theme'))
+        theme = normalize_theme_name(
+            migrate_session_theme(session.get('theme'), session.get('theme_version'))
+        )
         theme_index = THEME_OPTIONS.index(theme)
         self.theme_combo.blockSignals(True)
         self.theme_combo.setCurrentIndex(theme_index)
@@ -141,6 +145,7 @@ class MainWindow(QMainWindow):
         }
         self.session_store.save({
             'theme': self._current_theme(),
+            'theme_version': CURRENT_THEME_VERSION,
             'window': window_state,
             'tabs': tab_state.get('tabs', []),
             'current_tab_index': tab_state.get('current_tab_index', 0),

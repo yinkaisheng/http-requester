@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtWidgets import QTabWidget, QWidget
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import QPushButton, QTabBar, QTabWidget, QWidget
 
 from models.http_models import HistoryRecord
 from pyqt_async_task import AsyncTask
 from storage.history_store import HistoryStore
 from ui.request_tab import RequestTab
+
+TAB_CLOSE_BUTTON_TEXT = '\u00d7'
 
 
 class RequestTabWidget(QTabWidget):
@@ -28,11 +30,32 @@ class RequestTabWidget(QTabWidget):
         self.history_store = history_store
         self.async_task = async_task
         self._record_tab_map: Dict[str, int] = {}
-        self.setTabsClosable(True)
+        self.setTabsClosable(False)
         self.setMovable(True)
-        self.tabCloseRequested.connect(self._close_tab_at_index)
         self.tabBar().tabMoved.connect(self._rebuild_map)
         self.tabBarDoubleClicked.connect(self._on_tab_bar_double_clicked)
+
+    def addTab(self, widget: QWidget, label: str) -> int:
+        index = super().addTab(widget, label)
+        self._install_tab_close_button(index)
+        return index
+
+    def _install_tab_close_button(self, index: int) -> None:
+        btn = QPushButton(TAB_CLOSE_BUTTON_TEXT, self)
+        btn.setObjectName('tabCloseButton')
+        btn.setFixedSize(18, 18)
+        btn.setFlat(True)
+        btn.setFocusPolicy(Qt.NoFocus)
+        btn.clicked.connect(self._on_tab_close_button_clicked)
+        self.tabBar().setTabButton(index, QTabBar.RightSide, btn)
+
+    def _on_tab_close_button_clicked(self) -> None:
+        btn = self.sender()
+        tab_bar = self.tabBar()
+        for index in range(tab_bar.count()):
+            if tab_bar.tabButton(index, QTabBar.RightSide) is btn:
+                self._close_tab_at_index(index)
+                return
 
     def open_record(self, record: HistoryRecord) -> None:
         if record.id in self._record_tab_map:

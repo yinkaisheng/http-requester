@@ -8,7 +8,9 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QClipboard
 from PyQt5.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -24,10 +26,14 @@ from PyQt5.QtWidgets import (
 
 from models.http_models import DEFAULT_REQUEST_TIMEOUT_SECONDS, HTTP_METHODS, HistoryRecord, HttpRequest, HttpResponse
 from pyqt_async_task import AsyncTask, MsgIDThreadExit
+from services.curl_export import format_curl_linux_command
 from services.http_service import send_request
+from services.powershell_export import format_powershell_command
 from storage.history_store import HistoryStore
 from ui.body_editor import BodyEditor
 from ui.headers_editor import (
+    COPY_CURL_MENU_TEXT,
+    COPY_POWERSHELL_MENU_TEXT,
     RequestHeadersPanel,
     _set_compact_table_header,
     attach_header_table_menu,
@@ -143,17 +149,32 @@ class RequestTab(QWidget):
         self.send_btn.setObjectName('primaryButton')
         self.send_btn.setFixedWidth(80)
         self.send_btn.clicked.connect(self._on_send_clicked)
+        self.curl_btn = QPushButton('curl')
+        self.curl_btn.setToolTip(COPY_CURL_MENU_TEXT)
+        self.curl_btn.clicked.connect(self._copy_request_as_curl)
+        self.pwsh_btn = QPushButton('pwsh')
+        self.pwsh_btn.setToolTip(COPY_POWERSHELL_MENU_TEXT)
+        self.pwsh_btn.clicked.connect(self._copy_request_as_powershell)
+        self.send_btn.ensurePolished()
+        toolbar_btn_height = self.send_btn.sizeHint().height()
+        self.curl_btn.setFixedHeight(toolbar_btn_height)
+        self.pwsh_btn.setFixedHeight(toolbar_btn_height)
         toolbar.addWidget(self.method_combo)
         toolbar.addWidget(self.ssl_verify_check)
         toolbar.addWidget(self.url_edit, 1)
         toolbar.addWidget(timeout_row)
         toolbar.addWidget(self.send_btn)
+        toolbar.addWidget(self.curl_btn)
+        toolbar.addWidget(self.pwsh_btn)
         layout.addLayout(toolbar)
 
         self.content_splitter = QSplitter(Qt.Horizontal)
 
         self.left_splitter = QSplitter(Qt.Vertical)
-        self.headers_panel = RequestHeadersPanel()
+        self.headers_panel = RequestHeadersPanel(
+            curl_copy_callback=self._copy_request_as_curl,
+            powershell_copy_callback=self._copy_request_as_powershell,
+        )
         self.body_editor = BodyEditor()
         self.left_splitter.addWidget(self.headers_panel)
         self.left_splitter.addWidget(self.body_editor)
@@ -395,6 +416,16 @@ class RequestTab(QWidget):
         display, tooltip = _truncate_status_text(text)
         self.status_label.setText(display)
         self.status_label.setToolTip(tooltip)
+
+    def _copy_request_as_curl(self) -> None:
+        command = format_curl_linux_command(self.collect_request())
+        if command:
+            QApplication.clipboard().setText(command, QClipboard.Clipboard)
+
+    def _copy_request_as_powershell(self) -> None:
+        command = format_powershell_command(self.collect_request())
+        if command:
+            QApplication.clipboard().setText(command, QClipboard.Clipboard)
 
     def _on_send_clicked(self) -> None:
         self.send_btn.setEnabled(False)

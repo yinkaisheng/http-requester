@@ -36,6 +36,9 @@ HEADER_TABLE_FONT_DELTA_PX = 0
 TOGGLE_CELL_MARGIN_V = 1
 HEADER_TABLE_TOGGLE_SIZE = 16
 
+COPY_CURL_MENU_TEXT = 'Copy As Curl Command'
+COPY_POWERSHELL_MENU_TEXT = 'Copy as PowerShell Command'
+
 
 def _compact_action_button(text: str) -> QPushButton:
     btn = QPushButton(text)
@@ -126,6 +129,8 @@ def attach_header_table_menu(
     key_col: int = 0,
     value_col: int = 1,
     paste_callback: Optional[Callable[[List[Tuple[str, str]]], None]] = None,
+    curl_callback: Optional[Callable[[], None]] = None,
+    powershell_callback: Optional[Callable[[], None]] = None,
 ) -> None:
     table.setContextMenuPolicy(Qt.CustomContextMenu)
 
@@ -138,6 +143,14 @@ def attach_header_table_menu(
         paste_action = None
         if paste_callback is not None:
             paste_action = menu.addAction('Paste')
+        curl_action = None
+        powershell_action = None
+        if curl_callback is not None or powershell_callback is not None:
+            menu.addSeparator()
+        if curl_callback is not None:
+            curl_action = menu.addAction(COPY_CURL_MENU_TEXT)
+        if powershell_callback is not None:
+            powershell_action = menu.addAction(COPY_POWERSHELL_MENU_TEXT)
 
         action = menu.exec_(table.viewport().mapToGlobal(pos))
         if action is None:
@@ -161,6 +174,10 @@ def attach_header_table_menu(
             parsed = parse_headers_text(clipboard.text())
             if parsed:
                 paste_callback(parsed)
+        elif curl_action is not None and action == curl_action:
+            curl_callback()
+        elif powershell_action is not None and action == powershell_action:
+            powershell_callback()
 
     table.customContextMenuRequested.connect(_on_context_menu)
 
@@ -246,8 +263,16 @@ class CheckMarkToggle(QPushButton):
 
 
 class RawHeadersEditor(QWidget):
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        *,
+        curl_copy_callback: Optional[Callable[[], None]] = None,
+        powershell_copy_callback: Optional[Callable[[], None]] = None,
+    ):
         super().__init__(parent)
+        self._curl_copy_callback = curl_copy_callback
+        self._powershell_copy_callback = powershell_copy_callback
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -270,6 +295,8 @@ class RawHeadersEditor(QWidget):
             key_col=1,
             value_col=2,
             paste_callback=self._paste_headers,
+            curl_callback=self._curl_copy_callback,
+            powershell_callback=self._powershell_copy_callback,
         )
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 2, 0, 0)
@@ -383,7 +410,13 @@ class RawHeadersEditor(QWidget):
 
 
 class SentHeadersView(QWidget):
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        *,
+        curl_copy_callback: Optional[Callable[[], None]] = None,
+        powershell_copy_callback: Optional[Callable[[], None]] = None,
+    ):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -395,7 +428,13 @@ class SentHeadersView(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         _set_compact_table_header(self.table, header_table=True)
-        attach_header_table_menu(self.table, key_col=0, value_col=1)
+        attach_header_table_menu(
+            self.table,
+            key_col=0,
+            value_col=1,
+            curl_callback=curl_copy_callback,
+            powershell_callback=powershell_copy_callback,
+        )
         layout.addWidget(self.table)
 
     def set_headers(self, headers: Dict[str, str]) -> None:
@@ -403,9 +442,17 @@ class SentHeadersView(QWidget):
 
 
 class RequestHeadersPanel(QWidget):
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        *,
+        curl_copy_callback: Optional[Callable[[], None]] = None,
+        powershell_copy_callback: Optional[Callable[[], None]] = None,
+    ):
         super().__init__(parent)
         self._sent_headers: Dict[str, str] = {}
+        self._curl_copy_callback = curl_copy_callback
+        self._powershell_copy_callback = powershell_copy_callback
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -437,8 +484,14 @@ class RequestHeadersPanel(QWidget):
         layout.addWidget(header_row)
 
         self.stack = QStackedWidget()
-        self.raw_editor = RawHeadersEditor()
-        self.sent_view = SentHeadersView()
+        self.raw_editor = RawHeadersEditor(
+            curl_copy_callback=self._curl_copy_callback,
+            powershell_copy_callback=self._powershell_copy_callback,
+        )
+        self.sent_view = SentHeadersView(
+            curl_copy_callback=self._curl_copy_callback,
+            powershell_copy_callback=self._powershell_copy_callback,
+        )
         self.stack.addWidget(self.raw_editor)
         self.stack.addWidget(self.sent_view)
         layout.addWidget(self.stack, 1)
