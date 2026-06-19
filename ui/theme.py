@@ -513,6 +513,13 @@ QTableWidget, QTableView {{
     gridline-color: {p.gridline};
     border: 1px solid {p.border};
     border-radius: 4px;
+    selection-background-color: {p.surface};
+    selection-color: {p.window_fg};
+}}
+
+QTableWidget::item:selected:!active, QTableView::item:selected:!active {{
+    background-color: {p.surface};
+    color: {p.window_fg};
 }}
 
 QTableWidget::item {{
