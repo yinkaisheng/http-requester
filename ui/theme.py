@@ -558,6 +558,34 @@ QPushButton#checkMarkToggle:checked:hover {{
     border-color: {p.accent_hover};
 }}
 
+QCheckBox#sslVerifyCheck {{
+    spacing: 4px;
+}}
+
+QCheckBox#sslVerifyCheck::indicator {{
+    width: 18px;
+    height: 18px;
+    border: 1px solid {p.border};
+    border-radius: 3px;
+    background-color: {p.window_bg};
+}}
+
+QCheckBox#sslVerifyCheck::indicator:hover {{
+    border-color: {p.border_strong};
+    background-color: {p.hover_bg_toggle};
+}}
+
+QCheckBox#sslVerifyCheck::indicator:checked {{
+    image: none;
+    background-color: {p.accent};
+    border-color: {p.accent};
+}}
+
+QCheckBox#sslVerifyCheck::indicator:checked:hover {{
+    background-color: {p.accent_hover};
+    border-color: {p.accent_hover};
+}}
+
 QPushButton#checkMarkToggleCompact {{
     background-color: {p.window_bg};
     border: 1px solid {p.border};

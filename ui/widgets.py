@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from PyQt5.QtCore import QPoint, QRect, QRectF, Qt
-from PyQt5.QtGui import QColor, QPainter, QPalette, QPolygon
+from PyQt5.QtCore import QPoint, QPointF, QRect, QRectF, Qt
+from PyQt5.QtGui import QColor, QPainter, QPalette, QPen, QPolygon
 from PyQt5.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QSpinBox,
     QStyle,
+    QStyleOptionButton,
     QStyleOptionComboBox,
     QStyleOptionSpinBox,
 )
@@ -15,10 +17,31 @@ from PyQt5.QtWidgets import (
 ARROW_GLYPH_BASE_PX = 8
 ARROW_GLYPH_HEIGHT_PX = 6
 COMBO_DROPDOWN_WIDTH_PX = 26
+CHECK_MARK_COLOR = QColor('#ffffff')
 
 
 def _arrow_color(widget) -> QColor:
     return widget.palette().color(QPalette.WindowText)
+
+
+def _paint_check_mark(painter: QPainter, rect: QRect) -> None:
+    side = min(rect.width(), rect.height())
+    margin = side * 0.2
+    x0 = rect.x() + margin
+    y0 = rect.y() + side * 0.54
+    x1 = rect.x() + side * 0.4
+    y1 = rect.y() + side * 0.74
+    x2 = rect.x() + side - margin
+    y2 = rect.y() + side * 0.3
+
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    pen = QPen(CHECK_MARK_COLOR)
+    pen.setWidthF(max(1.6, side * 0.12))
+    pen.setCapStyle(Qt.RoundCap)
+    pen.setJoinStyle(Qt.RoundJoin)
+    painter.setPen(pen)
+    painter.drawLine(QPointF(x0, y0), QPointF(x1, y1))
+    painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
 
 
 def _paint_triangle(
@@ -128,5 +151,34 @@ class GlyphSpinBox(QSpinBox):
                 ARROW_GLYPH_HEIGHT_PX,
                 up=False,
             )
+        finally:
+            painter.end()
+
+
+class AccentCheckBox(QCheckBox):
+    """Checkbox with accent indicator and a painted check mark when selected."""
+
+    def __init__(self, text: str = '', parent=None):
+        super().__init__(text, parent)
+        self.setObjectName('sslVerifyCheck')
+        self.setFocusPolicy(Qt.NoFocus)
+        self.stateChanged.connect(lambda _state: self.update())
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if not self.isChecked():
+            return
+
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        indicator = self.style().subElementRect(
+            QStyle.SE_CheckBoxIndicator, opt, self
+        )
+        if indicator.isNull() or indicator.width() < 2:
+            return
+
+        painter = QPainter(self)
+        try:
+            _paint_check_mark(painter, indicator)
         finally:
             painter.end()

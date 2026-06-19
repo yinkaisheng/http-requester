@@ -28,13 +28,12 @@ from services.http_service import send_request
 from storage.history_store import HistoryStore
 from ui.body_editor import BodyEditor
 from ui.headers_editor import (
-    CheckMarkToggle,
     RequestHeadersPanel,
     _set_compact_table_header,
     attach_header_table_menu,
     fill_key_value_table,
 )
-from ui.widgets import ArrowComboBox, GlyphSpinBox
+from ui.widgets import AccentCheckBox, ArrowComboBox, GlyphSpinBox
 
 MSG_HTTP_DONE = 1
 DEFAULT_PANEL_RATIO = (1, 3)
@@ -124,15 +123,7 @@ class RequestTab(QWidget):
         toolbar = QHBoxLayout()
         self.method_combo = ArrowComboBox()
         self.method_combo.addItems(HTTP_METHODS)
-        ssl_verify_row = QWidget()
-        ssl_verify_layout = QHBoxLayout(ssl_verify_row)
-        ssl_verify_layout.setContentsMargins(0, 0, 0, 0)
-        ssl_verify_layout.setSpacing(4)
-        self.ssl_verify_check = CheckMarkToggle(checked=False)
-        ssl_verify_label = QLabel('SSL Verify')
-        ssl_verify_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        ssl_verify_layout.addWidget(self.ssl_verify_check)
-        ssl_verify_layout.addWidget(ssl_verify_label)
+        self.ssl_verify_check = AccentCheckBox('SSL Verify')
         self.url_edit = QLineEdit()
         self.url_edit.setPlaceholderText('https://api.example.com/path')
         timeout_row = QWidget()
@@ -153,7 +144,7 @@ class RequestTab(QWidget):
         self.send_btn.setFixedWidth(80)
         self.send_btn.clicked.connect(self._on_send_clicked)
         toolbar.addWidget(self.method_combo)
-        toolbar.addWidget(ssl_verify_row)
+        toolbar.addWidget(self.ssl_verify_check)
         toolbar.addWidget(self.url_edit, 1)
         toolbar.addWidget(timeout_row)
         toolbar.addWidget(self.send_btn)
