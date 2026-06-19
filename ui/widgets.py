@@ -5,14 +5,20 @@ from __future__ import annotations
 from PyQt5.QtCore import QPoint, QPointF, QRect, QRectF, Qt
 from PyQt5.QtGui import QColor, QPainter, QPalette, QPen, QPolygon
 from PyQt5.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
+    QListView,
     QSpinBox,
     QStyle,
     QStyleOptionButton,
     QStyleOptionComboBox,
     QStyleOptionSpinBox,
+    QStyleOptionViewItem,
+    QStyledItemDelegate,
 )
+
+from ui.theme import popup_list_font
 
 ARROW_GLYPH_BASE_PX = 8
 ARROW_GLYPH_HEIGHT_PX = 6
@@ -76,14 +82,41 @@ def _paint_triangle(
     painter.drawPolygon(QPolygon(points))
 
 
+class _AppFontItemDelegate(QStyledItemDelegate):
+    """Force combo popup rows to use the same pixel size as global QSS."""
+
+    def initStyleOption(self, option: QStyleOptionViewItem, index) -> None:
+        super().initStyleOption(option, index)
+        option.font = popup_list_font()
+
+
 class ArrowComboBox(QComboBox):
     """Paint a dropdown glyph after the style pass; Fusion+QSS often hides native arrows."""
 
-    def showPopup(self) -> None:
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._setup_popup_view()
+
+    def _setup_popup_view(self) -> None:
+        view = QListView(self)
+        view.setObjectName('comboPopupListView')
+        view.setItemDelegate(_AppFontItemDelegate(view))
+        self.setView(view)
+
+    def _sync_popup_font(self) -> None:
+        font = popup_list_font()
         view = self.view()
         if view is not None:
-            view.setFont(self.font())
+            view.setFont(font)
+
+    def showPopup(self) -> None:
+        self._sync_popup_font()
         super().showPopup()
+        view = self.view()
+        if view is not None:
+            popup = view.window()
+            if popup is not view:
+                popup.setFont(popup_list_font())
 
     def paintEvent(self, event) -> None:
         super().paintEvent(event)

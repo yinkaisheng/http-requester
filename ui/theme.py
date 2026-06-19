@@ -176,10 +176,33 @@ def apply_app_theme(app: QApplication, theme: str | None = THEME_SOLARIZED) -> N
     app.setStyleSheet(_build_stylesheet(app.font(), palette))
 
 
+def resolve_ui_font_size_px(font: QFont | None = None) -> int:
+    """Match the pixel size used by global QSS (*, QComboBox, etc.)."""
+    if font is None:
+        app = QApplication.instance()
+        if app is None:
+            return 13
+        font = app.font()
+    pixel_size = font.pixelSize()
+    if pixel_size > 0:
+        return pixel_size
+    return int(font.pointSize() * 1.33)
+
+
+def popup_list_font(font: QFont | None = None) -> QFont:
+    """Font for combo popups; QSS alone does not reliably style popup views."""
+    app = QApplication.instance()
+    base = font or (app.font() if app is not None else QFont())
+    ui_font = QFont(base)
+    ui_font.setPixelSize(resolve_ui_font_size_px(base))
+    return ui_font
+
+
 def _build_stylesheet(font: QFont, palette: ThemePalette) -> str:
-    size_px = font.pixelSize() if font.pixelSize() > 0 else int(font.pointSize() * 1.33)
+    size_px = resolve_ui_font_size_px(font)
     body_text_font_size = size_px + BODY_TEXT_FONT_DELTA_PX
     body_text_font_family = _body_text_font_family()
+    ui_font_family = font.family().replace('"', '\\"')
     p = palette
     return f'''
 * {{
@@ -398,6 +421,7 @@ QComboBox, QSpinBox {{
     border: 1px solid {p.border};
     border-radius: 4px;
     padding: 4px 8px;
+    font-family: "{ui_font_family}";
     font-size: {size_px}px;
     selection-background-color: {p.accent};
     selection-color: {p.on_accent};
@@ -468,11 +492,12 @@ QSpinBox::down-button:hover {{
     background-color: {p.hover_bg};
 }}
 
-QComboBox QAbstractItemView {{
+QComboBox QAbstractItemView, QListView#comboPopupListView {{
     background-color: {p.window_bg};
     border: 1px solid {p.border};
     selection-background-color: {p.surface};
     selection-color: {p.window_fg};
+    font-family: "{ui_font_family}";
     font-size: {size_px}px;
     outline: none;
 }}
