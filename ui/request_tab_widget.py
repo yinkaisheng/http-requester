@@ -51,6 +51,8 @@ class RequestTabWidget(QTabWidget):
 
     def _on_tab_close_button_clicked(self) -> None:
         btn = self.sender()
+        if btn is None:
+            return
         tab_bar = self.tabBar()
         for index in range(tab_bar.count()):
             if tab_bar.tabButton(index, QTabBar.RightSide) is btn:

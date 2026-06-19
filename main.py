@@ -7,7 +7,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QStyleFactory
 
 hpath = Path(__file__).resolve().parent / 'Lib' / 'http-requester'
-sys.path.append(str(hpath))
+sys.path.append(str(hpath)) # need for building portable release
 # print(f"Added {hpath} to sys.path")
 
 from log_util import config_logger, logger

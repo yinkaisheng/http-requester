@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QCloseEvent
 from PyQt5.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -17,6 +18,7 @@ from PyQt5.QtWidgets import (
 
 from pyqt_async_task import AsyncTask
 from storage.history_store import HistoryStore
+from models.http_models import HistoryRecord
 from storage.session_store import SessionStore
 from ui.history_panel import HistoryPanel
 from ui.request_tab_widget import RequestTabWidget
@@ -151,7 +153,7 @@ class MainWindow(QMainWindow):
             'current_tab_index': tab_state.get('current_tab_index', 0),
         })
 
-    def closeEvent(self, event) -> None:
+    def closeEvent(self, event: 'QCloseEvent') -> None:
         self._save_session()
         super().closeEvent(event)
 
@@ -178,5 +180,5 @@ class MainWindow(QMainWindow):
         if record:
             self.history_panel.upsert_record(record)
 
-    def _on_record_saved(self, record) -> None:
+    def _on_record_saved(self, record: HistoryRecord) -> None:
         self.history_panel.upsert_record(record)

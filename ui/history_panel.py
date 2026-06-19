@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from PyQt5.QtCore import Qt, pyqtSignal, QSize, QEvent
-from PyQt5.QtGui import QFontMetrics
+from PyQt5.QtCore import QObject, QPoint, Qt, pyqtSignal, QSize, QEvent
+from PyQt5.QtGui import QFontMetrics, QMouseEvent, QResizeEvent
 from PyQt5.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
@@ -67,11 +67,11 @@ class HistoryItemWidget(QWidget):
         else:
             self.label.setText(metrics.elidedText(self._full_text, Qt.ElideRight, available))
 
-    def resizeEvent(self, event) -> None:
+    def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
         self._apply_elision()
 
-    def mouseReleaseEvent(self, event) -> None:
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.LeftButton:
             child = self.childAt(event.pos())
             if child is not self.delete_btn:
@@ -107,13 +107,16 @@ class HistoryPanel(QWidget):
         self.list_widget.viewport().installEventFilter(self)
         layout.addWidget(self.list_widget)
 
-    def eventFilter(self, obj, event) -> bool:
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         if obj is self.list_widget.viewport() and event.type() == QEvent.Resize:
             self._refresh_item_elision()
         return super().eventFilter(obj, event)
 
     def reload(self) -> None:
         self._records = self.history_store.load()
+        self._rebuild_list()
+
+    def _rebuild_list(self) -> None:
         self.list_widget.clear()
         self._item_widgets.clear()
         for record in self._records:
@@ -129,7 +132,7 @@ class HistoryPanel(QWidget):
         if not found:
             self._records.insert(0, record)
         self._records.sort(key=lambda r: r.updated_at, reverse=True)
-        self.reload()
+        self._rebuild_list()
 
     def _add_record_item(self, record: HistoryRecord) -> None:
         item = QListWidgetItem()
@@ -148,7 +151,7 @@ class HistoryPanel(QWidget):
         for widget in self._item_widgets.values():
             widget._apply_elision()
 
-    def _show_context_menu(self, pos) -> None:
+    def _show_context_menu(self, pos: 'QPoint') -> None:
         item = self.list_widget.itemAt(pos)
         if not item:
             return

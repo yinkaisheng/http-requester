@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from PyQt5.QtCore import QPoint, QPointF, QRect, QRectF, Qt
-from PyQt5.QtGui import QColor, QPainter, QPalette, QPen, QPolygon
+from PyQt5.QtCore import QModelIndex, QPoint, QPointF, QRect, QRectF, Qt
+from PyQt5.QtGui import QColor, QPainter, QPaintEvent, QPalette, QPen, QPolygon
 from PyQt5.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -85,7 +85,7 @@ def _paint_triangle(
 class _AppFontItemDelegate(QStyledItemDelegate):
     """Force combo popup rows to use the same pixel size as global QSS."""
 
-    def initStyleOption(self, option: QStyleOptionViewItem, index) -> None:
+    def initStyleOption(self, option: QStyleOptionViewItem, index: 'QModelIndex') -> None:
         super().initStyleOption(option, index)
         option.font = popup_list_font()
 
@@ -118,7 +118,7 @@ class ArrowComboBox(QComboBox):
             if popup is not view:
                 popup.setFont(popup_list_font())
 
-    def paintEvent(self, event) -> None:
+    def paintEvent(self, event: 'QPaintEvent') -> None:
         super().paintEvent(event)
         opt = QStyleOptionComboBox()
         self.initStyleOption(opt)
@@ -157,7 +157,7 @@ class ArrowComboBox(QComboBox):
 class GlyphSpinBox(QSpinBox):
     """Paint up/down glyphs after the style pass; Fusion+QSS often hides native arrows."""
 
-    def paintEvent(self, event) -> None:
+    def paintEvent(self, event: 'QPaintEvent') -> None:
         super().paintEvent(event)
         opt = QStyleOptionSpinBox()
         self.initStyleOption(opt)
@@ -203,7 +203,7 @@ class AccentCheckBox(QCheckBox):
         self.setFocusPolicy(Qt.NoFocus)
         self.stateChanged.connect(lambda _state: self.update())
 
-    def paintEvent(self, event) -> None:
+    def paintEvent(self, event: 'QPaintEvent') -> None:
         super().paintEvent(event)
         if not self.isChecked():
             return

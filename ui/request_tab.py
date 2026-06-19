@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QClipboard
@@ -54,7 +54,7 @@ def _status_code_style_id(status_code: int) -> str:
     return 'statusError'
 
 
-def _truncate_status_text(text: str, max_length: int = STATUS_DISPLAY_MAX_LENGTH) -> tuple[str, str]:
+def _truncate_status_text(text: str, max_length: int = STATUS_DISPLAY_MAX_LENGTH) -> Tuple[str, str]:
     full = text.strip()
     if len(full) <= max_length:
         return full, ''
@@ -63,7 +63,7 @@ def _truncate_status_text(text: str, max_length: int = STATUS_DISPLAY_MAX_LENGTH
     return full[: max_length - 1] + '…', full
 
 
-def _ratio_sizes(total: int, ratio: tuple[int, int]) -> List[int]:
+def _ratio_sizes(total: int, ratio: Tuple[int, int]) -> List[int]:
     if total <= 0:
         return []
     r1, r2 = ratio
@@ -77,7 +77,7 @@ def _valid_sizes(sizes) -> bool:
     )
 
 
-def _http_worker(signal, task_id, req: HttpRequest):
+def _http_worker(signal: pyqtSignal, task_id: int, req: HttpRequest) -> None:
     resp = send_request(req)
     signal.emit((task_id, MSG_HTTP_DONE, resp))
 
@@ -432,9 +432,14 @@ class RequestTab(QWidget):
         self._set_status_text('Sending...')
         self._set_status_style('statusPending')
         req = self.collect_request()
-        self.async_task.runTaskInThread(_http_worker, req, self._on_http_result)
+        try:
+            self.async_task.runTaskInThread(_http_worker, req, self._on_http_result)
+        except Exception:
+            self.send_btn.setEnabled(True)
+            self._set_status_text('Error: Failed to start request')
+            self._set_status_style('statusError')
 
-    def _on_http_result(self, task_id: int, msg_id: int, data) -> None:
+    def _on_http_result(self, task_id: int, msg_id: int, data: Any) -> None:
         if msg_id == MsgIDThreadExit:
             self.send_btn.setEnabled(True)
             return

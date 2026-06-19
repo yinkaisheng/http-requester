@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import time
-from typing import (Any, Callable, Dict, List, Tuple, Type)
-from PyQt5.QtCore import (QObject, QThread, QTimer, pyqtSignal, pyqtSlot)
+from typing import Any, Callable, Tuple, Type
 
-from log_util import Fore, log, current_thread_id
+from PyQt5.QtCore import QObject, QThread, QTimer, pyqtSignal
+
+from log_util import log, current_thread_id
 
 
 MsgIDThreadExit = 0
@@ -176,8 +177,8 @@ class AsyncTask():
         else:
             self.taskNotifiers[taskId](taskId, msgId, args)
         if msgId == MsgIDThreadExit:
-            # avoid QThread: Destroyed while thread is still running
-            while self.taskThreads[taskId].isRunning():
-                time.sleep(0.005)
+            thread = self.taskThreads.get(taskId)
+            if thread is not None:
+                thread.wait(_WAIT_FOREVER_MS)
             del self.taskThreads[taskId]
             del self.taskNotifiers[taskId]

@@ -41,9 +41,12 @@ class HistoryStore:
     def _save_all(self, records: List[HistoryRecord]) -> None:
         self._ensure_dir()
         payload = {'records': [r.to_dict() for r in records]}
-        with open(self.path, 'w', encoding='utf-8') as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-        self._cache = records
+        try:
+            with open(self.path, 'w', encoding='utf-8') as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
+            self._cache = records
+        except OSError:
+            pass
 
     def upsert(self, record: HistoryRecord) -> None:
         records = self.load()

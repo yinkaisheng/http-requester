@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import requests
 
@@ -19,11 +19,12 @@ def _enabled_headers(req: HttpRequest) -> Dict[str, str]:
     return headers
 
 
-def _prepare_body(req: HttpRequest) -> Tuple[Optional[Union[str, bytes, Dict]], Optional[object], Optional[Dict]]:
-    """Return (data, json, files) kwargs for requests."""
+def _prepare_body(req: HttpRequest) -> Tuple[Optional[Union[str, bytes, Dict]], Optional[object], Optional[Dict], List]:
+    """Return (data, json, files, opened_files) kwargs for requests."""
     data = None
     json_body = None
     files = None
+    opened_files: List = []
 
     if req.body_type == BodyType.RAW:
         data = req.body_text.encode('utf-8')
@@ -42,7 +43,9 @@ def _prepare_body(req: HttpRequest) -> Tuple[Optional[Union[str, bytes, Dict]], 
                 continue
             key = field.key.strip()
             if field.is_file and field.file_path and os.path.isfile(field.file_path):
-                files[key] = open(field.file_path, 'rb')
+                fh = open(field.file_path, 'rb')
+                files[key] = fh
+                opened_files.append(fh)
             else:
                 data[key] = field.value
         if not data:
@@ -52,9 +55,11 @@ def _prepare_body(req: HttpRequest) -> Tuple[Optional[Union[str, bytes, Dict]], 
     elif req.body_type == BodyType.FILE:
         if req.file_path and os.path.isfile(req.file_path):
             filename = os.path.basename(req.file_path)
-            files = {'file': (filename, open(req.file_path, 'rb'))}
+            fh = open(req.file_path, 'rb')
+            files = {'file': (filename, fh)}
+            opened_files.append(fh)
 
-    return data, json_body, files
+    return data, json_body, files, opened_files
 
 
 def _actual_request_headers(response: requests.Response) -> Dict[str, str]:
@@ -71,20 +76,12 @@ def send_request(req: HttpRequest) -> HttpResponse:
 
     method = req.method.upper()
     headers = _enabled_headers(req)
-    data, json_body, files = _prepare_body(req)
+    data, json_body, files, opened_files = _prepare_body(req)
 
     if req.body_type == BodyType.JSON and 'Content-Type' not in headers:
         headers['Content-Type'] = 'application/json'
     elif req.body_type == BodyType.RAW and 'Content-Type' not in headers:
         headers['Content-Type'] = 'text/plain'
-
-    opened_files = []
-    if files:
-        for value in files.values():
-            if isinstance(value, tuple):
-                opened_files.append(value[1])
-            else:
-                opened_files.append(value)
 
     timeout = req.timeout_seconds if req.timeout_seconds > 0 else DEFAULT_REQUEST_TIMEOUT_SECONDS
 

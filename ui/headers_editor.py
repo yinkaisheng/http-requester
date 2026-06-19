@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List, Optional, Tuple
 
-from PyQt5.QtCore import QPointF, Qt
-from PyQt5.QtGui import QClipboard, QColor, QFontMetrics, QPainter, QPen
+from PyQt5.QtCore import QPointF, QPoint, Qt
+from PyQt5.QtGui import QClipboard, QColor, QFontMetrics, QPaintEvent, QPainter, QPen
 from PyQt5.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -134,7 +134,7 @@ def attach_header_table_menu(
 ) -> None:
     table.setContextMenuPolicy(Qt.CustomContextMenu)
 
-    def _on_context_menu(pos) -> None:
+    def _on_context_menu(pos: 'QPoint') -> None:
         row = table.rowAt(pos.y())
         menu = QMenu(table)
 
@@ -234,7 +234,7 @@ class CheckMarkToggle(QPushButton):
         self.setText('')
         self.toggled.connect(self.update)
 
-    def paintEvent(self, event) -> None:
+    def paintEvent(self, event: 'QPaintEvent') -> None:
         super().paintEvent(event)
         if not self.isChecked():
             return

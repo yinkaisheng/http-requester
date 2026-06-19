@@ -28,6 +28,13 @@ from ui.headers_editor import HEADER_ROW_HEIGHT, TableEditDelegate, _compact_act
 FORM_CELL_MARGIN_V = 2
 FORM_CELL_MARGIN_H = 4
 
+_BODY_TYPE_TO_STACK_INDEX = {
+    0: 0,  # Raw
+    1: 0,  # JSON (shares text page)
+    2: 1,  # Form Data
+    3: 2,  # File Upload
+}
+
 
 class BodyEditor(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
@@ -148,14 +155,7 @@ class BodyEditor(QWidget):
 
     def _on_type_changed(self) -> None:
         btn_id = self.type_group.checkedId()
-        if btn_id <= 1:
-            self.stack.setCurrentIndex(0)
-        elif btn_id == 2:
-            self.stack.setCurrentIndex(1)
-        elif btn_id == 3:
-            self.stack.setCurrentIndex(2)
-        else:
-            self.stack.setCurrentIndex(0)
+        self.stack.setCurrentIndex(_BODY_TYPE_TO_STACK_INDEX.get(btn_id, 0))
 
     def _form_row_height(self) -> int:
         return _table_row_height(self.form_table, editable=True)
