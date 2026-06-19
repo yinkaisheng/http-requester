@@ -8,6 +8,7 @@ from PyQt5.QtCore import QPointF, QPoint, Qt
 from PyQt5.QtGui import QClipboard, QFontMetrics, QPaintEvent, QPainter, QPen
 from PyQt5.QtWidgets import (
     QApplication,
+    QAbstractItemView,
     QButtonGroup,
     QHBoxLayout,
     QHeaderView,
@@ -112,6 +113,9 @@ def _set_compact_table_header(table: QTableWidget, editable: bool = False, *, he
     v_header.setDefaultSectionSize(row_height)
     v_header.setMinimumSectionSize(row_height)
     v_header.setVisible(False)
+    if header_table:
+        table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SingleSelection)
 
 
 def _read_table_rows(table: QTableWidget, key_col: int, value_col: int) -> List[Tuple[str, str]]:
