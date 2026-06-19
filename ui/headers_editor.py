@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List, Optional, Tuple
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QClipboard, QFontMetrics
+from PyQt5.QtCore import QPointF, Qt
+from PyQt5.QtGui import QClipboard, QColor, QFontMetrics, QPainter, QPen
 from PyQt5.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -198,7 +198,7 @@ def fill_key_value_table(table: QTableWidget, headers: Dict[str, str]) -> None:
 
 
 class CheckMarkToggle(QPushButton):
-    CHECK_MARK = '✓'
+    CHECK_MARK_COLOR = QColor('#ffffff')
 
     def __init__(
         self,
@@ -214,11 +214,35 @@ class CheckMarkToggle(QPushButton):
         self.setChecked(checked)
         self.setFixedSize(size, size)
         self.setFocusPolicy(Qt.NoFocus)
-        self._update_display()
-        self.toggled.connect(self._update_display)
+        self.setText('')
+        self.toggled.connect(self.update)
 
-    def _update_display(self) -> None:
-        self.setText(self.CHECK_MARK if self.isChecked() else '')
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if not self.isChecked():
+            return
+
+        side = min(self.width(), self.height())
+        margin = side * 0.2
+        x0 = margin
+        y0 = side * 0.54
+        x1 = side * 0.4
+        y1 = side * 0.74
+        x2 = side - margin
+        y2 = side * 0.3
+
+        painter = QPainter(self)
+        try:
+            painter.setRenderHint(QPainter.Antialiasing, True)
+            pen = QPen(self.CHECK_MARK_COLOR)
+            pen.setWidthF(max(1.6, side * 0.12))
+            pen.setCapStyle(Qt.RoundCap)
+            pen.setJoinStyle(Qt.RoundJoin)
+            painter.setPen(pen)
+            painter.drawLine(QPointF(x0, y0), QPointF(x1, y1))
+            painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
+        finally:
+            painter.end()
 
 
 class RawHeadersEditor(QWidget):

@@ -535,9 +535,6 @@ QPushButton#checkMarkToggle {{
     background-color: {p.window_bg};
     border: 1px solid {p.border};
     border-radius: 3px;
-    color: transparent;
-    font-weight: bold;
-    font-size: {max(size_px - 3, 11)}px;
     padding: 0;
     min-width: 18px;
     max-width: 18px;
@@ -565,9 +562,6 @@ QPushButton#checkMarkToggleCompact {{
     background-color: {p.window_bg};
     border: 1px solid {p.border};
     border-radius: 3px;
-    color: transparent;
-    font-weight: bold;
-    font-size: {max(size_px - 4, 10)}px;
     padding: 0;
     min-width: 16px;
     max-width: 16px;
