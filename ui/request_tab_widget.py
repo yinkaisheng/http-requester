@@ -5,11 +5,12 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QPushButton, QTabBar, QTabWidget, QWidget
+from PyQt5.QtWidgets import QMenu, QPushButton, QTabBar, QTabWidget, QWidget
 
 from models.http_models import HistoryRecord
 from pyqt_async_task import AsyncTask
 from storage.history_store import HistoryStore
+from ui.dialogs import prompt_text
 from ui.request_tab import RequestTab
 
 TAB_CLOSE_BUTTON_TEXT = '\u00d7'
@@ -17,8 +18,8 @@ TAB_CLOSE_BUTTON_TEXT = '\u00d7'
 
 class RequestTabWidget(QTabWidget):
     tab_title_changed = pyqtSignal()
-    record_bound = pyqtSignal(str)
     record_saved = pyqtSignal(object)
+    record_renamed = pyqtSignal(str, str)
 
     def __init__(
         self,
@@ -32,6 +33,8 @@ class RequestTabWidget(QTabWidget):
         self._record_tab_map: Dict[str, int] = {}
         self.setTabsClosable(False)
         self.setMovable(True)
+        self.tabBar().setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tabBar().customContextMenuRequested.connect(self._on_tab_context_menu)
         self.tabBar().tabMoved.connect(self._rebuild_map)
         self.tabBarDoubleClicked.connect(self._on_tab_bar_double_clicked)
 
@@ -91,7 +94,6 @@ class RequestTabWidget(QTabWidget):
             tab = RequestTab(self.history_store, self.async_task, record=record)
         tab.record_saved.connect(self._on_tab_saved)
         tab.record_saved.connect(self.record_saved.emit)
-        tab.record_bound.connect(self._on_record_bound)
         return tab
 
     def restore_session(
@@ -139,6 +141,18 @@ class RequestTabWidget(QTabWidget):
                 return
         self._ensure_at_least_one_tab()
 
+    def close_record_tabs(self, record_ids: List[str]) -> None:
+        id_set = set(record_ids)
+        indices = []
+        for i in range(self.count()):
+            widget = self.widget(i)
+            if isinstance(widget, RequestTab):
+                rid = widget.get_record_id()
+                if rid and rid in id_set:
+                    indices.append(i)
+        for index in sorted(indices, reverse=True):
+            self._close_tab_at_index(index)
+
     def _ensure_at_least_one_tab(self) -> None:
         if self.count() == 0:
             self.new_request()
@@ -159,6 +173,57 @@ class RequestTabWidget(QTabWidget):
         if index >= 0:
             self._close_tab_at_index(index)
 
+    def _on_tab_context_menu(self, pos) -> None:
+        index = self.tabBar().tabAt(pos)
+        if index < 0:
+            return
+        widget = self.widget(index)
+        if not isinstance(widget, RequestTab):
+            return
+
+        menu = QMenu(self)
+        rename_action = menu.addAction('Rename tab')
+        action = menu.exec_(self.tabBar().mapToGlobal(pos))
+        if action == rename_action:
+            self._rename_tab_at_index(index)
+
+    def _rename_tab_at_index(self, index: int) -> None:
+        widget = self.widget(index)
+        if not isinstance(widget, RequestTab):
+            return
+        new_name = prompt_text(
+            self,
+            'Rename tab',
+            'Tab name:',
+            widget.tab_title(),
+        )
+        if not new_name:
+            return
+        record_id = widget.get_record_id()
+        if record_id:
+            updated = self.history_store.rename(record_id, new_name)
+            if not updated:
+                return
+            widget.apply_record_name(new_name)
+            self.record_renamed.emit(record_id, new_name)
+        else:
+            widget.set_draft_name(new_name)
+        self.setTabText(index, widget.tab_title())
+        self.tab_title_changed.emit()
+
+    def update_tab_title_for_record(self, record_id: str, new_name: str) -> None:
+        if record_id not in self._record_tab_map:
+            return
+        index = self._record_tab_map[record_id]
+        if index < 0 or index >= self.count():
+            return
+        widget = self.widget(index)
+        if not isinstance(widget, RequestTab):
+            return
+        widget.apply_record_name(new_name)
+        self.setTabText(index, widget.tab_title())
+        self.tab_title_changed.emit()
+
     def _rebuild_map(self) -> None:
         self._record_tab_map.clear()
         for i in range(self.count()):
@@ -169,20 +234,11 @@ class RequestTabWidget(QTabWidget):
                     self._record_tab_map[record_id] = i
 
     def _on_tab_saved(self, record: HistoryRecord) -> None:
+        sender_tab = self.sender()
         for i in range(self.count()):
             widget = self.widget(i)
-            if isinstance(widget, RequestTab) and widget.get_record_id() == record.id:
+            if widget is sender_tab and isinstance(widget, RequestTab):
                 self.setTabText(i, widget.tab_title())
                 break
+        self._rebuild_map()
         self.tab_title_changed.emit()
-
-    def _on_record_bound(self, record_id: str) -> None:
-        current_widget = self.currentWidget()
-        if isinstance(current_widget, RequestTab):
-            self._rebuild_map()
-            for i in range(self.count()):
-                if self.widget(i) is current_widget:
-                    self._record_tab_map[record_id] = i
-                    self.setTabText(i, current_widget.tab_title())
-                    break
-        self.record_bound.emit(record_id)

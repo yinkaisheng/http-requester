@@ -42,7 +42,8 @@ from ui.headers_editor import (
 from ui.widgets import AccentCheckBox, ArrowComboBox, GlyphSpinBox
 
 MSG_HTTP_DONE = 1
-DEFAULT_PANEL_RATIO = (1, 3)
+DEFAULT_CONTENT_RATIO = 0.5
+DEFAULT_PANEL_RATIO = 0.25
 STATUS_DISPLAY_MAX_LENGTH = 72
 
 
@@ -63,18 +64,23 @@ def _truncate_status_text(text: str, max_length: int = STATUS_DISPLAY_MAX_LENGTH
     return full[: max_length - 1] + '…', full
 
 
-def _ratio_sizes(total: int, ratio: Tuple[int, int]) -> List[int]:
+def splitter_sizes_to_ratio(sizes: List[int]) -> float:
+    total = sum(sizes)
+    if total <= 0:
+        return DEFAULT_CONTENT_RATIO
+    return round(sizes[0] / total, 3)
+
+
+def splitter_ratio_to_sizes(total: int, ratio: float) -> List[int]:
     if total <= 0:
         return []
-    r1, r2 = ratio
-    first = total * r1 // (r1 + r2)
+    ratio = max(0.0, min(1.0, float(ratio)))
+    first = int(total * ratio)
     return [first, total - first]
 
 
-def _valid_sizes(sizes) -> bool:
-    return isinstance(sizes, list) and len(sizes) == 2 and all(
-        isinstance(s, int) and s > 0 for s in sizes
-    )
+def _valid_ratio(ratio) -> bool:
+    return isinstance(ratio, (int, float)) and 0.0 <= ratio <= 1.0
 
 
 def _http_worker(signal: pyqtSignal, task_id: int, req: HttpRequest) -> None:
@@ -122,7 +128,6 @@ def _response_snapshot(resp: HttpResponse) -> dict:
 
 class RequestTab(QWidget):
     record_saved = pyqtSignal(object)
-    record_bound = pyqtSignal(str)
 
     def __init__(
         self,
@@ -137,6 +142,7 @@ class RequestTab(QWidget):
         self.async_task.setMsgIDName(MSG_HTTP_DONE, 'MSG_HTTP_DONE')
         self.record_id: Optional[str] = record.id if record else None
         self._record = record
+        self._draft_name = ''
         self._init_ui()
         if record:
             self.load_record(record)
@@ -193,6 +199,7 @@ class RequestTab(QWidget):
         self.headers_panel = RequestHeadersPanel(
             curl_copy_callback=self._copy_request_as_curl,
             powershell_copy_callback=self._copy_request_as_powershell,
+            paste_request_callback=self._apply_imported_request,
         )
         self.body_editor = BodyEditor()
         self.left_splitter.addWidget(self.headers_panel)
@@ -268,9 +275,9 @@ class RequestTab(QWidget):
 
     def get_splitter_state(self) -> dict:
         return {
-            'content': self.content_splitter.sizes(),
-            'left': self.left_splitter.sizes(),
-            'right': self.right_splitter.sizes(),
+            'content': splitter_sizes_to_ratio(self.content_splitter.sizes()),
+            'left': splitter_sizes_to_ratio(self.left_splitter.sizes()),
+            'right': splitter_sizes_to_ratio(self.right_splitter.sizes()),
         }
 
     def set_splitter_state(self, state: Optional[dict]) -> None:
@@ -284,11 +291,11 @@ class RequestTab(QWidget):
 
     def apply_splitter_sizes(
         self,
-        content: Optional[List[int]] = None,
-        left: Optional[List[int]] = None,
-        right: Optional[List[int]] = None,
+        content: Optional[float] = None,
+        left: Optional[float] = None,
+        right: Optional[float] = None,
     ) -> None:
-        """Apply splitter sizes once layout is ready; missing dimensions use defaults."""
+        """Apply splitter ratios once layout is ready; missing values use defaults."""
 
         def _apply() -> None:
             lh = self.left_splitter.height()
@@ -297,18 +304,12 @@ class RequestTab(QWidget):
             if lh <= 0 or rh <= 0 or cw <= 0:
                 QTimer.singleShot(50, _apply)
                 return
-            if _valid_sizes(content):
-                self.content_splitter.setSizes(content)
-            else:
-                self.content_splitter.setSizes([cw // 2, cw - cw // 2])
-            if _valid_sizes(left):
-                self.left_splitter.setSizes(left)
-            else:
-                self.left_splitter.setSizes(_ratio_sizes(lh, DEFAULT_PANEL_RATIO))
-            if _valid_sizes(right):
-                self.right_splitter.setSizes(right)
-            else:
-                self.right_splitter.setSizes(_ratio_sizes(rh, DEFAULT_PANEL_RATIO))
+            content_ratio = content if _valid_ratio(content) else DEFAULT_CONTENT_RATIO
+            left_ratio = left if _valid_ratio(left) else DEFAULT_PANEL_RATIO
+            right_ratio = right if _valid_ratio(right) else DEFAULT_PANEL_RATIO
+            self.content_splitter.setSizes(splitter_ratio_to_sizes(cw, content_ratio))
+            self.left_splitter.setSizes(splitter_ratio_to_sizes(lh, left_ratio))
+            self.right_splitter.setSizes(splitter_ratio_to_sizes(rh, right_ratio))
 
         QTimer.singleShot(0, _apply)
 
@@ -316,16 +317,29 @@ class RequestTab(QWidget):
         self.apply_splitter_sizes()
 
     def tab_title(self) -> str:
+        if self._record and self._record.name.strip():
+            return self._record.name.strip()
+        if self._draft_name.strip():
+            return self._draft_name.strip()
         url = self.url_edit.text().strip()
-        if self._record and self._record.name:
-            return self._record.name
         if url:
             return url
         return 'New Request'
 
+    def apply_record_name(self, name: str) -> None:
+        if self._record is not None:
+            self._record.name = name.strip()
+
+    def set_draft_name(self, name: str) -> None:
+        self._draft_name = name.strip()
+
+    def get_draft_name(self) -> str:
+        return self._draft_name
+
     def load_record(self, record: HistoryRecord) -> None:
         self._record = record
         self.record_id = record.id
+        self._draft_name = ''
         self.load_request(record.request, record.sent_headers)
         self._apply_saved_response(
             record.last_status,
@@ -385,6 +399,7 @@ class RequestTab(QWidget):
             }
         return {
             'record_id': record_id,
+            'draft_name': self._draft_name if not record_id else '',
             'request': self.collect_request().to_dict(),
             'sent_headers': self.headers_panel.get_sent_headers(),
             'response': response,
@@ -396,6 +411,7 @@ class RequestTab(QWidget):
         request = HttpRequest.from_dict(state.get('request', {}))
         sent_headers = state.get('sent_headers', {})
         response_state = state.get('response', {})
+        self._draft_name = state.get('draft_name', '') or state.get('tab_name', '') or ''
         self._record = None
         self.record_id = None
         record = None
@@ -450,6 +466,11 @@ class RequestTab(QWidget):
         command = format_powershell_command(self.collect_request())
         if command:
             QApplication.clipboard().setText(command, QClipboard.Clipboard)
+
+    def _apply_imported_request(self, req: HttpRequest) -> None:
+        self.load_request(req)
+        self.headers_panel.show_raw_mode()
+        self._clear_response_display()
 
     def _on_send_clicked(self) -> None:
         self.send_btn.setEnabled(False)
@@ -534,29 +555,27 @@ class RequestTab(QWidget):
     def _save_to_history(self, resp: HttpResponse) -> None:
         req = self.collect_request()
         now = datetime.now(timezone.utc).isoformat()
-
-        if self._record is None:
-            self._record = HistoryRecord(
-                id=str(uuid.uuid4()),
-                request=req,
-                created_at=now,
-            )
-            self.record_id = self._record.id
-            self.record_bound.emit(self.record_id)
-
-        self._record.request = req
-        self._record.sent_headers = self.headers_panel.get_sent_headers()
-        self._record.updated_at = now
+        record = HistoryRecord(
+            id=str(uuid.uuid4()),
+            request=req,
+            sent_headers=self.headers_panel.get_sent_headers(),
+            created_at=now,
+            updated_at=now,
+        )
+        if self._draft_name.strip():
+            record.name = self._draft_name.strip()
         if not resp.error:
             snapshot = _response_snapshot(resp)
-            self._record.last_status = snapshot['last_status']
-            self._record.last_status_reason = snapshot['last_status_reason']
-            self._record.last_elapsed_ms = snapshot['last_elapsed_ms']
-            self._record.response_headers = snapshot['response_headers']
-            self._record.response_body = snapshot['response_body']
+            record.last_status = snapshot['last_status']
+            record.last_status_reason = snapshot['last_status_reason']
+            record.last_elapsed_ms = snapshot['last_elapsed_ms']
+            record.response_headers = snapshot['response_headers']
+            record.response_body = snapshot['response_body']
 
-        self.history_store.upsert(self._record)
-        self.record_saved.emit(self._record)
+        self._record = record
+        self.record_id = record.id
+        self.history_store.add(record)
+        self.record_saved.emit(record)
 
     def get_record_id(self) -> Optional[str]:
         return self.record_id

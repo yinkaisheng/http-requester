@@ -23,7 +23,9 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from models.http_models import HeaderItem
+from models.http_models import HeaderItem, HttpRequest
+from services.curl_import import parse_curl_command
+from services.powershell_import import parse_powershell_command
 from ui.widgets import CHECK_MARK_COLOR
 
 TABLE_HEADER_HEIGHT = 22
@@ -39,6 +41,9 @@ HEADER_TABLE_TOGGLE_SIZE = 16
 
 COPY_CURL_MENU_TEXT = 'Copy as Curl Command'
 COPY_POWERSHELL_MENU_TEXT = 'Copy as PowerShell Command'
+PASTE_HEADERS_MENU_TEXT = 'Paste Headers'
+PASTE_CURL_MENU_TEXT = 'Paste from Curl Command'
+PASTE_POWERSHELL_MENU_TEXT = 'Paste from PowerShell Command'
 
 
 def _compact_action_button(text: str) -> QPushButton:
@@ -130,6 +135,7 @@ def attach_header_table_menu(
     key_col: int = 0,
     value_col: int = 1,
     paste_callback: Optional[Callable[[List[Tuple[str, str]]], None]] = None,
+    paste_request_callback: Optional[Callable[[HttpRequest], None]] = None,
     curl_callback: Optional[Callable[[], None]] = None,
     powershell_callback: Optional[Callable[[], None]] = None,
 ) -> None:
@@ -139,11 +145,19 @@ def attach_header_table_menu(
         row = table.rowAt(pos.y())
         menu = QMenu(table)
 
-        copy_action = menu.addAction('Copy')
-        copy_all_action = menu.addAction('Copy All')
+        copy_action = menu.addAction('Copy Header')
+        copy_action.setEnabled(row >= 0)
+        copy_all_action = menu.addAction('Copy All Headers')
         paste_action = None
+        paste_curl_action = None
+        paste_powershell_action = None
+        if paste_callback is not None or paste_request_callback is not None:
+            menu.addSeparator()
         if paste_callback is not None:
-            paste_action = menu.addAction('Paste')
+            paste_action = menu.addAction(PASTE_HEADERS_MENU_TEXT)
+        if paste_request_callback is not None:
+            paste_curl_action = menu.addAction(PASTE_CURL_MENU_TEXT)
+            paste_powershell_action = menu.addAction(PASTE_POWERSHELL_MENU_TEXT)
         curl_action = None
         powershell_action = None
         if curl_callback is not None or powershell_callback is not None:
@@ -175,6 +189,14 @@ def attach_header_table_menu(
             parsed = parse_headers_text(clipboard.text())
             if parsed:
                 paste_callback(parsed)
+        elif paste_curl_action is not None and action == paste_curl_action:
+            req = parse_curl_command(QApplication.clipboard().text())
+            if req is not None:
+                paste_request_callback(req)
+        elif paste_powershell_action is not None and action == paste_powershell_action:
+            req = parse_powershell_command(QApplication.clipboard().text())
+            if req is not None:
+                paste_request_callback(req)
         elif curl_action is not None and action == curl_action:
             curl_callback()
         elif powershell_action is not None and action == powershell_action:
@@ -268,10 +290,12 @@ class RawHeadersEditor(QWidget):
         *,
         curl_copy_callback: Optional[Callable[[], None]] = None,
         powershell_copy_callback: Optional[Callable[[], None]] = None,
+        paste_request_callback: Optional[Callable[[HttpRequest], None]] = None,
     ):
         super().__init__(parent)
         self._curl_copy_callback = curl_copy_callback
         self._powershell_copy_callback = powershell_copy_callback
+        self._paste_request_callback = paste_request_callback
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -294,6 +318,7 @@ class RawHeadersEditor(QWidget):
             key_col=1,
             value_col=2,
             paste_callback=self._paste_headers,
+            paste_request_callback=self._paste_request_callback,
             curl_callback=self._curl_copy_callback,
             powershell_callback=self._powershell_copy_callback,
         )
@@ -447,11 +472,13 @@ class RequestHeadersPanel(QWidget):
         *,
         curl_copy_callback: Optional[Callable[[], None]] = None,
         powershell_copy_callback: Optional[Callable[[], None]] = None,
+        paste_request_callback: Optional[Callable[[HttpRequest], None]] = None,
     ):
         super().__init__(parent)
         self._sent_headers: Dict[str, str] = {}
         self._curl_copy_callback = curl_copy_callback
         self._powershell_copy_callback = powershell_copy_callback
+        self._paste_request_callback = paste_request_callback
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -486,6 +513,7 @@ class RequestHeadersPanel(QWidget):
         self.raw_editor = RawHeadersEditor(
             curl_copy_callback=self._curl_copy_callback,
             powershell_copy_callback=self._powershell_copy_callback,
+            paste_request_callback=self._paste_request_callback,
         )
         self.sent_view = SentHeadersView(
             curl_copy_callback=self._curl_copy_callback,

@@ -6,5 +6,9 @@ import sys
 from pathlib import Path
 
 APP_DIR = Path(sys.argv[0]).resolve().parent
-HISTORY_FILE = APP_DIR / 'history.json'
-SESSION_FILE = APP_DIR / 'session.json'
+DATA_DIR = APP_DIR / 'data'
+HISTORY_INDEX_FILE = DATA_DIR / 'history_index.json'
+RECORDS_DIR = DATA_DIR / 'records'
+SESSION_FILE = DATA_DIR / 'session.json'
+
+STORAGE_VERSION = 1

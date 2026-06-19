@@ -46,6 +46,7 @@ class ThemePalette:
     border_strong: str
     text_muted: str
     text_subtle: str
+    text_disabled: str
     hover_bg: str
     hover_bg_soft: str
     hover_bg_toggle: str
@@ -69,6 +70,7 @@ SOLARIZED_LIGHT_PALETTE = ThemePalette(
     border_strong='#839496',
     text_muted='#586e75',
     text_subtle='#839496',
+    text_disabled='#93a2a1',
     hover_bg='#e8e2cf',
     hover_bg_soft='#f5efdc',
     hover_bg_toggle='#faf4e6',
@@ -92,6 +94,7 @@ WHITE_LIGHT_PALETTE = ThemePalette(
     border_strong='#c8c8c8',
     text_muted='#555555',
     text_subtle='#777777',
+    text_disabled='#aaaaaa',
     hover_bg='#eeeeee',
     hover_bg_soft='#f5f5f5',
     hover_bg_toggle='#f0f0f0',
@@ -115,6 +118,7 @@ DARK_PALETTE = ThemePalette(
     border_strong='#657b83',
     text_muted='#93a2a1',
     text_subtle='#839496',
+    text_disabled='#516872',
     hover_bg='#0e4d5c',
     hover_bg_soft='#0a3d4a',
     hover_bg_toggle='#0a3d4a',
@@ -228,8 +232,24 @@ QMenu {{
     padding: 4px;
 }}
 
+QMenu::item {{
+    color: {p.window_fg};
+    padding: 5px 28px 5px 12px;
+    border-radius: 3px;
+}}
+
+QMenu::item:disabled {{
+    color: {p.text_disabled};
+}}
+
 QMenu::item:selected {{
-    background-color: {p.surface};
+    background-color: {p.hover_bg_soft};
+    color: {p.window_fg};
+}}
+
+QMenu::item:selected:disabled {{
+    background-color: transparent;
+    color: {p.text_disabled};
 }}
 
 QStatusBar {{

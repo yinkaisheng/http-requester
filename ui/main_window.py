@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QCloseEvent
 from PyQt5.QtWidgets import (
     QApplication,
@@ -21,6 +21,7 @@ from storage.history_store import HistoryStore
 from models.http_models import HistoryRecord
 from storage.session_store import SessionStore
 from ui.history_panel import HistoryPanel
+from ui.request_tab import splitter_ratio_to_sizes, splitter_sizes_to_ratio
 from ui.request_tab_widget import RequestTabWidget
 from ui.theme import (
     CURRENT_THEME_VERSION,
@@ -36,6 +37,7 @@ from ui.widgets import ArrowComboBox
 class MainWindow(QMainWindow):
     DEFAULT_WIDTH = 1600
     DEFAULT_HEIGHT = 900
+    DEFAULT_MAIN_SPLITTER_RATIO = round(280 / (280 + 920), 3)
 
     def __init__(self):
         super().__init__()
@@ -93,8 +95,14 @@ class MainWindow(QMainWindow):
     def _connect_signals(self) -> None:
         self.history_panel.record_selected.connect(self._on_record_selected)
         self.history_panel.record_deleted.connect(self.request_tabs.close_record_tab)
-        self.request_tabs.record_bound.connect(self._on_record_bound)
+        self.history_panel.records_bulk_deleted.connect(self.request_tabs.close_record_tabs)
+        self.history_panel.record_renamed.connect(self._on_record_renamed)
+        self.request_tabs.record_renamed.connect(self._on_record_renamed)
         self.request_tabs.record_saved.connect(self._on_record_saved)
+
+    def _on_record_renamed(self, record_id: str, new_name: str) -> None:
+        self.history_panel.update_record_name(record_id, new_name)
+        self.request_tabs.update_tab_title_for_record(record_id, new_name)
 
     def _restore_session(self) -> None:
         session = self.session_store.load()
@@ -118,9 +126,9 @@ class MainWindow(QMainWindow):
         self.resize(width, height)
         self._center_on_screen()
 
-        main_sizes = window.get('main_splitter')
-        if isinstance(main_sizes, list) and len(main_sizes) == 2 and self._main_splitter:
-            self._main_splitter.setSizes(main_sizes)
+        main_ratio = window.get('main_splitter')
+        if isinstance(main_ratio, (int, float)) and 0.0 <= main_ratio <= 1.0 and self._main_splitter:
+            QTimer.singleShot(0, lambda r=float(main_ratio): self._apply_main_splitter_ratio(r))
 
         tabs = session.get('tabs', [])
         current_index = session.get('current_tab_index', 0)
@@ -138,14 +146,28 @@ class MainWindow(QMainWindow):
         y = available.y() + max(0, (available.height() - self.height()) // 2)
         self.move(x, y)
 
+    def _apply_main_splitter_ratio(self, ratio: float) -> None:
+        if not self._main_splitter:
+            return
+        width = self._main_splitter.width()
+        if width <= 0:
+            QTimer.singleShot(50, lambda: self._apply_main_splitter_ratio(ratio))
+            return
+        self._main_splitter.setSizes(splitter_ratio_to_sizes(width, ratio))
+
     def _save_session(self) -> None:
         tab_state = self.request_tabs.get_session_state()
         window_state = {
             'width': self.width(),
             'height': self.height(),
-            'main_splitter': self._main_splitter.sizes() if self._main_splitter else [280, 920],
+            'main_splitter': (
+                splitter_sizes_to_ratio(self._main_splitter.sizes())
+                if self._main_splitter
+                else self.DEFAULT_MAIN_SPLITTER_RATIO
+            ),
         }
         self.session_store.save({
+            'version': 1,
             'theme': self._current_theme(),
             'theme_version': CURRENT_THEME_VERSION,
             'window': window_state,
@@ -175,10 +197,5 @@ class MainWindow(QMainWindow):
         if record:
             self.request_tabs.open_record(record)
 
-    def _on_record_bound(self, record_id: str) -> None:
-        record = self.history_store.get(record_id)
-        if record:
-            self.history_panel.upsert_record(record)
-
     def _on_record_saved(self, record: HistoryRecord) -> None:
-        self.history_panel.upsert_record(record)
+        self.history_panel.prepend_record(record)

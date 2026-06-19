@@ -96,6 +96,7 @@ logs/
 # Local app data
 history.json
 session.json
+data/
 
 # Jupyter
 .ipynb_checkpoints/

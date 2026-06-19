@@ -8,11 +8,11 @@ from PyQt5.QtCore import QObject, QPoint, Qt, pyqtSignal, QSize, QEvent
 from PyQt5.QtGui import QFontMetrics, QMouseEvent, QResizeEvent
 from PyQt5.QtWidgets import (
     QHBoxLayout,
-    QInputDialog,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QMenu,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
 
 from models.http_models import HistoryRecord
 from storage.history_store import HistoryStore
+from ui.dialogs import prompt_text
 
 DELETE_BUTTON_WIDTH = 28
 ITEM_HORIZONTAL_MARGIN = 16
@@ -82,6 +83,8 @@ class HistoryItemWidget(QWidget):
 class HistoryPanel(QWidget):
     record_selected = pyqtSignal(str)
     record_deleted = pyqtSignal(str)
+    records_bulk_deleted = pyqtSignal(list)
+    record_renamed = pyqtSignal(str, str)
     records_changed = pyqtSignal()
 
     def __init__(self, history_store: HistoryStore, parent: Optional[QWidget] = None):
@@ -122,17 +125,19 @@ class HistoryPanel(QWidget):
         for record in self._records:
             self._add_record_item(record)
 
-    def upsert_record(self, record: HistoryRecord) -> None:
-        found = False
-        for i, existing in enumerate(self._records):
-            if existing.id == record.id:
-                self._records[i] = record
-                found = True
-                break
-        if not found:
-            self._records.insert(0, record)
-        self._records.sort(key=lambda r: r.updated_at, reverse=True)
+    def prepend_record(self, record: HistoryRecord) -> None:
+        self._records = [r for r in self._records if r.id != record.id]
+        self._records.insert(0, record)
         self._rebuild_list()
+
+    def update_record_name(self, record_id: str, new_name: str) -> None:
+        for record in self._records:
+            if record.id == record_id:
+                record.name = new_name
+                widget = self._item_widgets.get(record_id)
+                if widget is not None:
+                    widget.set_full_text(record.list_text())
+                return
 
     def _add_record_item(self, record: HistoryRecord) -> None:
         item = QListWidgetItem()
@@ -162,42 +167,96 @@ class HistoryPanel(QWidget):
         menu = QMenu(self)
         rename_action = menu.addAction('Rename')
         delete_action = menu.addAction('Delete')
+        menu.addSeparator()
+        delete_others_action = menu.addAction('Delete Others Except This')
+        delete_same_action = menu.addAction('Delete Same Method && URL Except This')
+        delete_all_action = menu.addAction('Delete ALL')
         action = menu.exec_(self.list_widget.mapToGlobal(pos))
 
         if action == rename_action:
             self._rename_record(record_id)
         elif action == delete_action:
             self._delete_record(record_id, confirm=True)
+        elif action == delete_others_action:
+            self._delete_others_except(record_id)
+        elif action == delete_same_action:
+            self._delete_same_method_url_except(record_id)
+        elif action == delete_all_action:
+            self._delete_all()
 
     def _rename_record(self, record_id: str) -> None:
         record = self.history_store.get(record_id)
         if not record:
             return
-        new_name, ok = QInputDialog.getText(
-            self, 'Rename', 'Request name:', text=record.name or record.display_name()
+        new_name = prompt_text(
+            self,
+            'Rename',
+            'Request name:',
+            record.name or record.display_name(),
         )
-        if ok and new_name.strip():
-            updated = self.history_store.rename(record_id, new_name.strip())
-            if updated:
-                self.reload()
-                self.records_changed.emit()
+        if not new_name:
+            return
+        updated = self.history_store.rename(record_id, new_name)
+        if updated:
+            self.update_record_name(record_id, new_name)
+            self.record_renamed.emit(record_id, new_name)
+            self.records_changed.emit()
+
+    def _confirm(self, message: str, title: str = 'Confirm Delete') -> bool:
+        reply = QMessageBox.question(
+            self,
+            title,
+            message,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        return reply == QMessageBox.Yes
+
+    def _delete_records(self, record_ids: List[str], confirm: bool, message: str) -> None:
+        if not record_ids:
+            return
+        if confirm and not self._confirm(message):
+            return
+        deleted = self.history_store.delete_many(record_ids)
+        if not deleted:
+            return
+        self.reload()
+        if len(deleted) == 1:
+            self.record_deleted.emit(deleted[0])
+        else:
+            self.records_bulk_deleted.emit(deleted)
+        self.records_changed.emit()
 
     def _delete_record(self, record_id: str, confirm: bool = False) -> None:
-        if confirm:
-            from PyQt5.QtWidgets import QMessageBox
-            reply = QMessageBox.question(
-                self,
-                'Confirm Delete',
-                'Are you sure you want to delete this history record?',
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
-            )
-            if reply != QMessageBox.Yes:
-                return
-        if self.history_store.delete(record_id):
-            self.reload()
-            self.record_deleted.emit(record_id)
-            self.records_changed.emit()
+        self._delete_records(
+            [record_id],
+            confirm,
+            'Are you sure you want to delete this history record?',
+        )
+
+    def _delete_others_except(self, record_id: str) -> None:
+        ids = self.history_store.ids_except(record_id)
+        self._delete_records(
+            ids,
+            True,
+            f'Delete all other history records ({len(ids)} item(s))?',
+        )
+
+    def _delete_same_method_url_except(self, record_id: str) -> None:
+        ids = self.history_store.ids_same_method_url_except(record_id)
+        self._delete_records(
+            ids,
+            True,
+            f'Delete other records with the same method and URL ({len(ids)} item(s))?',
+        )
+
+    def _delete_all(self) -> None:
+        ids = self.history_store.all_ids()
+        self._delete_records(
+            ids,
+            True,
+            f'Delete all history records ({len(ids)} item(s))?',
+        )
 
     def get_record(self, record_id: str) -> Optional[HistoryRecord]:
         return self.history_store.get(record_id)
