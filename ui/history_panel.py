@@ -195,8 +195,6 @@ class HistoryPanel(QWidget):
             if reply != QMessageBox.Yes:
                 return
         if self.history_store.delete(record_id):
-            self._records = [r for r in self._records if r.id != record_id]
-            self._item_widgets.pop(record_id, None)
             self.reload()
             self.record_deleted.emit(record_id)
             self.records_changed.emit()

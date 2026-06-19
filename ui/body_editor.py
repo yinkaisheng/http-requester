@@ -109,7 +109,7 @@ class BodyEditor(QWidget):
 
         self.form_table = QTableWidget(0, 4)
         self.form_table.setHorizontalHeaderLabels(['Key', 'Value', 'File', 'File Path'])
-        self.form_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.form_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
         self.form_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.form_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.form_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Optional, Tuple
 
 from PyQt5.QtCore import QPointF, QPoint, Qt
-from PyQt5.QtGui import QClipboard, QColor, QFontMetrics, QPaintEvent, QPainter, QPen
+from PyQt5.QtGui import QClipboard, QFontMetrics, QPaintEvent, QPainter, QPen
 from PyQt5.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -24,6 +24,7 @@ from PyQt5.QtWidgets import (
 )
 
 from models.http_models import HeaderItem
+from ui.widgets import CHECK_MARK_COLOR
 
 TABLE_HEADER_HEIGHT = 22
 HEADER_ROW_HEIGHT = 24
@@ -36,7 +37,7 @@ HEADER_TABLE_FONT_DELTA_PX = 0
 TOGGLE_CELL_MARGIN_V = 1
 HEADER_TABLE_TOGGLE_SIZE = 16
 
-COPY_CURL_MENU_TEXT = 'Copy As Curl Command'
+COPY_CURL_MENU_TEXT = 'Copy as Curl Command'
 COPY_POWERSHELL_MENU_TEXT = 'Copy as PowerShell Command'
 
 
@@ -215,8 +216,6 @@ def fill_key_value_table(table: QTableWidget, headers: Dict[str, str]) -> None:
 
 
 class CheckMarkToggle(QPushButton):
-    CHECK_MARK_COLOR = QColor('#ffffff')
-
     def __init__(
         self,
         checked: bool = True,
@@ -251,7 +250,7 @@ class CheckMarkToggle(QPushButton):
         painter = QPainter(self)
         try:
             painter.setRenderHint(QPainter.Antialiasing, True)
-            pen = QPen(self.CHECK_MARK_COLOR)
+            pen = QPen(CHECK_MARK_COLOR)
             pen.setWidthF(max(1.6, side * 0.12))
             pen.setCapStyle(Qt.RoundCap)
             pen.setJoinStyle(Qt.RoundJoin)

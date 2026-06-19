@@ -30,7 +30,7 @@ def _load_app_icon() -> QIcon:
 
 
 def main():
-    config_logger(logger, log_to_stdout=False)
+    config_logger(logger)
     app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create('Fusion'))
     app.setApplicationName('HTTP Requester')

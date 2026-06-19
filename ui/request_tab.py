@@ -82,8 +82,27 @@ def _http_worker(signal: pyqtSignal, task_id: int, req: HttpRequest) -> None:
     signal.emit((task_id, MSG_HTTP_DONE, resp))
 
 
+MAX_PRETTY_PRINT_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+def _is_json_content_type(headers: Dict[str, str]) -> bool:
+    for name, value in headers.items():
+        if name.lower() != 'content-type':
+            continue
+        media_type = value.split(';', 1)[0].strip().lower()
+        if media_type == 'application/json' or media_type.endswith('+json'):
+            return True
+        if media_type == 'text/json':
+            return True
+    return False
+
+
 def _format_response_body_text(resp: HttpResponse) -> str:
     body_text = resp.body_text()
+    if len(resp.body) > MAX_PRETTY_PRINT_BYTES:
+        return body_text
+    if not _is_json_content_type(resp.headers):
+        return body_text
     try:
         parsed = json.loads(body_text)
         return json.dumps(parsed, ensure_ascii=False, indent=2)
@@ -244,7 +263,7 @@ class RequestTab(QWidget):
         self.content_splitter.addWidget(self.right_splitter)
         self.content_splitter.setStretchFactor(0, 1)
         self.content_splitter.setStretchFactor(1, 1)
-        self.content_splitter.setSizes([500, 500])
+        QTimer.singleShot(0, self.apply_default_splitter_sizes)
         layout.addWidget(self.content_splitter, 1)
 
     def get_splitter_state(self) -> dict:
@@ -257,17 +276,20 @@ class RequestTab(QWidget):
     def set_splitter_state(self, state: Optional[dict]) -> None:
         if not state:
             return
-        content = state.get('content')
-        left = state.get('left')
-        right = state.get('right')
-        if _valid_sizes(content):
-            self.content_splitter.setSizes(content)
-        if _valid_sizes(left):
-            self.left_splitter.setSizes(left)
-        if _valid_sizes(right):
-            self.right_splitter.setSizes(right)
+        self.apply_splitter_sizes(
+            content=state.get('content'),
+            left=state.get('left'),
+            right=state.get('right'),
+        )
 
-    def apply_default_splitter_sizes(self) -> None:
+    def apply_splitter_sizes(
+        self,
+        content: Optional[List[int]] = None,
+        left: Optional[List[int]] = None,
+        right: Optional[List[int]] = None,
+    ) -> None:
+        """Apply splitter sizes once layout is ready; missing dimensions use defaults."""
+
         def _apply() -> None:
             lh = self.left_splitter.height()
             rh = self.right_splitter.height()
@@ -275,18 +297,23 @@ class RequestTab(QWidget):
             if lh <= 0 or rh <= 0 or cw <= 0:
                 QTimer.singleShot(50, _apply)
                 return
-            self.left_splitter.setSizes(_ratio_sizes(lh, DEFAULT_PANEL_RATIO))
-            self.right_splitter.setSizes(_ratio_sizes(rh, DEFAULT_PANEL_RATIO))
-            self.content_splitter.setSizes([cw // 2, cw - cw // 2])
+            if _valid_sizes(content):
+                self.content_splitter.setSizes(content)
+            else:
+                self.content_splitter.setSizes([cw // 2, cw - cw // 2])
+            if _valid_sizes(left):
+                self.left_splitter.setSizes(left)
+            else:
+                self.left_splitter.setSizes(_ratio_sizes(lh, DEFAULT_PANEL_RATIO))
+            if _valid_sizes(right):
+                self.right_splitter.setSizes(right)
+            else:
+                self.right_splitter.setSizes(_ratio_sizes(rh, DEFAULT_PANEL_RATIO))
 
         QTimer.singleShot(0, _apply)
 
-    def set_content_splitter_sizes(self, sizes: List[int]) -> None:
-        if _valid_sizes(sizes):
-            self.content_splitter.setSizes(sizes)
-
-    def get_content_splitter_sizes(self) -> List[int]:
-        return self.content_splitter.sizes()
+    def apply_default_splitter_sizes(self) -> None:
+        self.apply_splitter_sizes()
 
     def tab_title(self) -> str:
         url = self.url_edit.text().strip()
@@ -402,9 +429,6 @@ class RequestTab(QWidget):
         if splitters:
             QTimer.singleShot(0, lambda s=splitters: self.set_splitter_state(s))
         else:
-            legacy = state.get('content_splitter')
-            if _valid_sizes(legacy):
-                QTimer.singleShot(0, lambda sz=legacy: self.set_content_splitter_sizes(sz))
             QTimer.singleShot(0, self.apply_default_splitter_sizes)
 
     def _set_status_style(self, style_id: str) -> None:

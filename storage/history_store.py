@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
+from log_util import logger
 from models.http_models import HistoryRecord
 from storage.paths import HISTORY_FILE
 
@@ -46,7 +47,7 @@ class HistoryStore:
                 json.dump(payload, f, ensure_ascii=False, indent=2)
             self._cache = records
         except OSError:
-            pass
+            logger.warning(f'Failed to save history to {self.path}')
 
     def upsert(self, record: HistoryRecord) -> None:
         records = self.load()

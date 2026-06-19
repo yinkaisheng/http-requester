@@ -7,7 +7,7 @@ import sys
 from typing import List, Tuple
 
 from models.http_models import BodyType, HttpRequest
-from services.curl_export import _has_header, _user_headers_ordered
+from services._header_utils import has_header, user_headers_ordered
 
 FILE_PATH_PLACEHOLDER_WIN = r'C:\path\to\file'
 FILE_PATH_PLACEHOLDER_UNIX = '/path/to/file'
@@ -119,11 +119,11 @@ def format_powershell_command(req: HttpRequest) -> str:
     if method != 'GET':
         lines.append(f'-Method {method}')
 
-    headers = _user_headers_ordered(req)
+    headers = user_headers_ordered(req)
     content_type = None
-    if req.body_type == BodyType.JSON and not _has_header(headers, 'Content-Type'):
+    if req.body_type == BodyType.JSON and not has_header(headers, 'Content-Type'):
         content_type = 'application/json'
-    elif req.body_type == BodyType.RAW and req.body_text and not _has_header(headers, 'Content-Type'):
+    elif req.body_type == BodyType.RAW and req.body_text and not has_header(headers, 'Content-Type'):
         content_type = 'text/plain'
 
     header_block = _format_headers_block(headers)

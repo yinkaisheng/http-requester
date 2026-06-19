@@ -99,9 +99,7 @@ class RequestTabWidget(QTabWidget):
         tabs: List[dict],
         current_index: int = 0,
     ) -> None:
-        while self.count() > 0:
-            self.removeTab(0)
-        self._record_tab_map.clear()
+        self._remove_all_tabs()
 
         if not tabs:
             self.new_request()
@@ -127,6 +125,11 @@ class RequestTabWidget(QTabWidget):
             'tabs': tabs,
             'current_tab_index': self.currentIndex(),
         }
+
+    def _remove_all_tabs(self) -> None:
+        while self.count() > 0:
+            self.removeTab(0)
+        self._record_tab_map.clear()
 
     def close_record_tab(self, record_id: str) -> None:
         if record_id in self._record_tab_map:

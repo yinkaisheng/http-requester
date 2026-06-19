@@ -137,10 +137,7 @@ THEME_PALETTES: Dict[ThemeName, ThemePalette] = {
 
 
 def migrate_session_theme(theme: str | None, theme_version: int | None) -> str | None:
-    """Map legacy session values before multi-light themes were introduced."""
-    if theme_version is None or theme_version < CURRENT_THEME_VERSION:
-        if theme == 'light':
-            return THEME_SOLARIZED
+    """Return the theme name as-is (legacy migration no longer needed)."""
     return theme
 
 

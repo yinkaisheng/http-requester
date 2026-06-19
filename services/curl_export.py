@@ -6,25 +6,13 @@ import sys
 from typing import List, Tuple
 
 from models.http_models import BodyType, HttpRequest
+from services._header_utils import has_header, user_headers_ordered
 
 FILE_PATH_PLACEHOLDER = '/path/to/file'
 
 
 def _shell_quote(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
-
-
-def _has_header(headers: List[Tuple[str, str]], name: str) -> bool:
-    lower = name.lower()
-    return any(key.lower() == lower for key, _ in headers)
-
-
-def _user_headers_ordered(req: HttpRequest) -> List[Tuple[str, str]]:
-    rows: List[Tuple[str, str]] = []
-    for item in req.headers:
-        if item.enabled and item.key.strip():
-            rows.append((item.key.strip(), item.value))
-    return rows
 
 
 def _windows_path_to_wsl(path: str) -> str:
@@ -116,10 +104,10 @@ def format_curl_linux_command(req: HttpRequest) -> str:
     if method != 'GET':
         segments.append(f'-X {method}')
 
-    headers = _user_headers_ordered(req)
-    if req.body_type == BodyType.JSON and not _has_header(headers, 'Content-Type'):
+    headers = user_headers_ordered(req)
+    if req.body_type == BodyType.JSON and not has_header(headers, 'Content-Type'):
         headers.append(('Content-Type', 'application/json'))
-    elif req.body_type == BodyType.RAW and req.body_text and not _has_header(headers, 'Content-Type'):
+    elif req.body_type == BodyType.RAW and req.body_text and not has_header(headers, 'Content-Type'):
         headers.append(('Content-Type', 'text/plain'))
 
     for key, value in headers:

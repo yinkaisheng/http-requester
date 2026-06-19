@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from log_util import logger
 from storage.paths import SESSION_FILE
 
 
@@ -40,4 +41,4 @@ class SessionStore:
                 json.dump(session, f, ensure_ascii=False, indent=2)
             self._cache = session
         except OSError:
-            pass
+            logger.warning(f'Failed to save session to {self.path}')

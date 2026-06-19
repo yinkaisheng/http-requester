@@ -66,9 +66,11 @@ class AsyncTask():
         now = time.monotonic()
         if timeMs == 0:
             func(*args, **kwargs)
-        if timeMs or intervalMs:
-            self.delayCallFuncs.append([now + timeMs / 1000, intervalMs, func, args, kwargs])
-            self.delayCallTimer.start(self.delayCallMiniIntervalMs)
+            if intervalMs == 0:
+                return
+            timeMs = intervalMs  # first repeat fires after one interval
+        self.delayCallFuncs.append([now + timeMs / 1000, intervalMs, func, args, kwargs])
+        self.delayCallTimer.start(self.delayCallMiniIntervalMs)
 
     def onDelayCallTimer(self) -> None:
         now = time.monotonic()
