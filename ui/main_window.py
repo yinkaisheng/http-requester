@@ -7,7 +7,6 @@ from typing import Optional
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QApplication,
-    QComboBox,
     QHBoxLayout,
     QMainWindow,
     QPushButton,
@@ -27,6 +26,7 @@ from ui.theme import (
     apply_app_theme,
     normalize_theme_name,
 )
+from ui.widgets import ArrowComboBox
 
 
 class MainWindow(QMainWindow):
@@ -59,7 +59,7 @@ class MainWindow(QMainWindow):
         self.new_btn.clicked.connect(self._on_new_request)
         top_layout.addWidget(self.new_btn)
 
-        self.theme_combo = QComboBox()
+        self.theme_combo = ArrowComboBox()
         self.theme_combo.setObjectName('themeCombo')
         self.theme_combo.setFixedWidth(88)
         for theme_name in THEME_OPTIONS:

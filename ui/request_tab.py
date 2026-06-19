@@ -9,14 +9,12 @@ from typing import Dict, List, Optional
 
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtWidgets import (
-    QComboBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
-    QSpinBox,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -36,6 +34,7 @@ from ui.headers_editor import (
     attach_header_table_menu,
     fill_key_value_table,
 )
+from ui.widgets import ArrowComboBox, GlyphSpinBox
 
 MSG_HTTP_DONE = 1
 DEFAULT_PANEL_RATIO = (1, 3)
@@ -123,7 +122,7 @@ class RequestTab(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
 
         toolbar = QHBoxLayout()
-        self.method_combo = QComboBox()
+        self.method_combo = ArrowComboBox()
         self.method_combo.addItems(HTTP_METHODS)
         ssl_verify_row = QWidget()
         ssl_verify_layout = QHBoxLayout(ssl_verify_row)
@@ -142,7 +141,7 @@ class RequestTab(QWidget):
         timeout_layout.setSpacing(4)
         timeout_label = QLabel('Timeout')
         timeout_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        self.timeout_spin = QSpinBox()
+        self.timeout_spin = GlyphSpinBox()
         self.timeout_spin.setRange(1, 3600)
         self.timeout_spin.setValue(DEFAULT_REQUEST_TIMEOUT_SECONDS)
         self.timeout_spin.setSuffix('s')

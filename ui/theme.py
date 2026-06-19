@@ -346,7 +346,7 @@ QPushButton#historyDeleteButton:hover {{
     color: {p.on_accent};
 }}
 
-QLineEdit, QPlainTextEdit, QComboBox, QSpinBox {{
+QLineEdit, QPlainTextEdit {{
     background-color: {p.window_bg};
     color: {p.window_fg};
     border: 1px solid {p.border};
@@ -356,7 +356,25 @@ QLineEdit, QPlainTextEdit, QComboBox, QSpinBox {{
     selection-color: {p.on_accent};
 }}
 
-QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus {{
+QComboBox, QSpinBox {{
+    background-color: {p.window_bg};
+    color: {p.window_fg};
+    border: 1px solid {p.border};
+    border-radius: 4px;
+    padding: 4px 8px;
+    selection-background-color: {p.accent};
+    selection-color: {p.on_accent};
+}}
+
+QComboBox {{
+    padding-right: 4px;
+}}
+
+QSpinBox {{
+    padding-right: 2px;
+}}
+
+QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus, QSpinBox:focus {{
     border-color: {p.accent};
 }}
 
@@ -366,8 +384,51 @@ QPlainTextEdit#bodyTextEdit {{
 }}
 
 QComboBox::drop-down {{
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 26px;
     border: none;
+    border-left: 1px solid {p.border};
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+    background-color: {p.surface};
+}}
+
+QComboBox::drop-down:hover {{
+    background-color: {p.hover_bg};
+}}
+
+QComboBox::down-arrow {{
+    image: none;
+    width: 14px;
+    height: 14px;
+}}
+
+QSpinBox::up-button, QSpinBox::down-button {{
+    subcontrol-origin: border;
     width: 20px;
+    border: none;
+    border-left: 1px solid {p.border};
+    background-color: {p.surface};
+}}
+
+QSpinBox::up-button {{
+    subcontrol-position: top right;
+    border-bottom: 1px solid {p.border};
+    border-top-right-radius: 3px;
+}}
+
+QSpinBox::up-button:hover {{
+    background-color: {p.hover_bg};
+}}
+
+QSpinBox::down-button {{
+    subcontrol-position: bottom right;
+    border-bottom-right-radius: 3px;
+}}
+
+QSpinBox::down-button:hover {{
+    background-color: {p.hover_bg};
 }}
 
 QComboBox QAbstractItemView {{
