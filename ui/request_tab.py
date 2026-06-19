@@ -24,7 +24,15 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from models.http_models import DEFAULT_REQUEST_TIMEOUT_SECONDS, HTTP_METHODS, HistoryRecord, HttpRequest, HttpResponse
+from models.http_models import (
+    DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    HTTP_METHODS,
+    HistoryRecord,
+    HttpRequest,
+    HttpResponse,
+    decode_stored_response_body,
+    encode_response_body_for_storage,
+)
 from pyqt_async_task import AsyncTask, MsgIDThreadExit
 from services.curl_export import format_curl_linux_command
 from services.http_service import send_request
@@ -117,12 +125,15 @@ def _format_response_body_text(resp: HttpResponse) -> str:
 
 
 def _response_snapshot(resp: HttpResponse) -> dict:
+    body_text = _format_response_body_text(resp)
+    stored_body, is_binary = encode_response_body_for_storage(body_text, resp.body)
     return {
-        'last_status': resp.status_code,
-        'last_status_reason': resp.reason,
-        'last_elapsed_ms': resp.elapsed_ms,
+        'status_code': resp.status_code,
+        'status_reason': resp.reason,
+        'elapsed_ms': resp.elapsed_ms,
         'response_headers': dict(resp.headers),
-        'response_body': _format_response_body_text(resp),
+        'response_body': stored_body,
+        'response_body_is_binary': is_binary,
     }
 
 
@@ -143,6 +154,7 @@ class RequestTab(QWidget):
         self.record_id: Optional[str] = record.id if record else None
         self._record = record
         self._draft_name = ''
+        self._cached_response: Optional[dict] = None
         self._init_ui()
         if record:
             self.load_record(record)
@@ -342,12 +354,21 @@ class RequestTab(QWidget):
         self._draft_name = ''
         self.load_request(record.request, record.sent_headers)
         self._apply_saved_response(
-            record.last_status,
-            record.last_status_reason,
-            record.last_elapsed_ms,
+            record.status_code,
+            record.status_reason,
+            record.elapsed_ms,
             record.response_headers,
             record.response_body,
+            record.response_body_is_binary,
         )
+        self._cached_response = {
+            'status_code': record.status_code,
+            'status_reason': record.status_reason,
+            'elapsed_ms': record.elapsed_ms,
+            'response_headers': dict(record.response_headers),
+            'response_body': record.response_body,
+            'response_body_is_binary': record.response_body_is_binary,
+        }
 
     def load_request(
         self,
@@ -387,16 +408,7 @@ class RequestTab(QWidget):
         record_id = self.record_id
         if record_id and not self.history_store.get(record_id):
             record_id = None
-        response = {}
-        source = self._record
-        if source:
-            response = {
-                'last_status': source.last_status,
-                'last_status_reason': source.last_status_reason,
-                'last_elapsed_ms': source.last_elapsed_ms,
-                'response_headers': dict(source.response_headers),
-                'response_body': source.response_body,
-            }
+        response = dict(self._cached_response) if self._cached_response else {}
         return {
             'record_id': record_id,
             'draft_name': self._draft_name if not record_id else '',
@@ -425,20 +437,31 @@ class RequestTab(QWidget):
         self.load_request(request, sent_headers)
         if record:
             self._apply_saved_response(
-                record.last_status,
-                record.last_status_reason,
-                record.last_elapsed_ms,
+                record.status_code,
+                record.status_reason,
+                record.elapsed_ms,
                 record.response_headers,
                 record.response_body,
+                record.response_body_is_binary,
             )
+            self._cached_response = {
+                'status_code': record.status_code,
+                'status_reason': record.status_reason,
+                'elapsed_ms': record.elapsed_ms,
+                'response_headers': dict(record.response_headers),
+                'response_body': record.response_body,
+                'response_body_is_binary': record.response_body_is_binary,
+            }
         elif response_state:
             self._apply_saved_response(
-                response_state.get('last_status'),
-                response_state.get('last_status_reason', ''),
-                response_state.get('last_elapsed_ms'),
+                response_state.get('status_code'),
+                response_state.get('status_reason', ''),
+                response_state.get('elapsed_ms'),
                 response_state.get('response_headers', {}),
                 response_state.get('response_body', ''),
+                response_state.get('response_body_is_binary', False),
             )
+            self._cached_response = dict(response_state)
         else:
             self._clear_response_display()
         splitters = state.get('splitters')
@@ -492,37 +515,46 @@ class RequestTab(QWidget):
             return
 
         resp: HttpResponse = data
-        if not resp.error and resp.request_headers:
+        if resp.request_headers:
             self.headers_panel.set_sent_headers(resp.request_headers)
-            self.headers_panel.show_sent_mode()
+            if not resp.error:
+                self.headers_panel.show_sent_mode()
         self._show_response(resp)
         self._save_to_history(resp)
 
     def _show_response(self, resp: HttpResponse) -> None:
-        if resp.error:
+        if resp.error and not resp.status_code:
             self._set_status_text(f'Error: {resp.error}')
             self._set_status_style('statusError')
             self.response_headers_table.setRowCount(0)
             self.response_body_edit.setPlainText('')
+            self._cached_response = None
             return
 
-        style_id = _status_code_style_id(resp.status_code)
-        self._set_status_text(
-            f'{resp.status_code} {resp.reason} · {resp.elapsed_ms:.0f} ms'
-        )
-        self._set_status_style(style_id)
+        if resp.error:
+            self._set_status_text(
+                f'Error: {resp.error} · {resp.status_code} {resp.reason} · {resp.elapsed_ms:.0f} ms'
+            )
+        else:
+            self._set_status_text(
+                f'{resp.status_code} {resp.reason} · {resp.elapsed_ms:.0f} ms'
+            )
+        self._set_status_style(_status_code_style_id(resp.status_code))
 
         self.response_headers_table.setRowCount(0)
         fill_key_value_table(self.response_headers_table, resp.headers)
 
         body_text = _format_response_body_text(resp)
         self.response_body_edit.setPlainText(body_text)
+        if not resp.error or resp.status_code:
+            self._cached_response = _response_snapshot(resp)
 
     def _clear_response_display(self) -> None:
         self._set_status_text('Waiting to send request')
         self._set_status_style('statusPending')
         self.response_headers_table.setRowCount(0)
         self.response_body_edit.setPlainText('')
+        self._cached_response = None
 
     def _apply_saved_response(
         self,
@@ -531,6 +563,7 @@ class RequestTab(QWidget):
         elapsed_ms: Optional[float],
         headers: Optional[Dict[str, str]],
         body: str,
+        body_is_binary: bool = False,
     ) -> None:
         headers = headers or {}
         if status_code is None and not headers and not body:
@@ -550,7 +583,7 @@ class RequestTab(QWidget):
             self._set_status_style('statusPending')
 
         fill_key_value_table(self.response_headers_table, headers)
-        self.response_body_edit.setPlainText(body or '')
+        self.response_body_edit.setPlainText(decode_stored_response_body(body or '', body_is_binary))
 
     def _save_to_history(self, resp: HttpResponse) -> None:
         req = self.collect_request()
@@ -564,13 +597,14 @@ class RequestTab(QWidget):
         )
         if self._draft_name.strip():
             record.name = self._draft_name.strip()
-        if not resp.error:
+        if not resp.error or resp.status_code:
             snapshot = _response_snapshot(resp)
-            record.last_status = snapshot['last_status']
-            record.last_status_reason = snapshot['last_status_reason']
-            record.last_elapsed_ms = snapshot['last_elapsed_ms']
+            record.status_code = snapshot['status_code']
+            record.status_reason = snapshot['status_reason']
+            record.elapsed_ms = snapshot['elapsed_ms']
             record.response_headers = snapshot['response_headers']
             record.response_body = snapshot['response_body']
+            record.response_body_is_binary = snapshot['response_body_is_binary']
 
         self._record = record
         self.record_id = record.id

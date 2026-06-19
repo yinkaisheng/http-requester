@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QLineEdit,
     QMenu,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QStackedWidget,
@@ -130,6 +131,10 @@ def _copy_to_clipboard(text: str) -> None:
     clipboard.setText(text, QClipboard.Clipboard)
 
 
+def _show_paste_error(parent: QWidget, message: str) -> None:
+    QMessageBox.information(parent, 'Paste failed', message)
+
+
 def attach_header_table_menu(
     table: QTableWidget,
     key_col: int = 0,
@@ -189,14 +194,20 @@ def attach_header_table_menu(
             parsed = parse_headers_text(clipboard.text())
             if parsed:
                 paste_callback(parsed)
+            else:
+                _show_paste_error(table, 'No valid header lines found in the clipboard.')
         elif paste_curl_action is not None and action == paste_curl_action:
             req = parse_curl_command(QApplication.clipboard().text())
             if req is not None:
                 paste_request_callback(req)
+            else:
+                _show_paste_error(table, 'Could not parse a curl command from the clipboard.')
         elif paste_powershell_action is not None and action == paste_powershell_action:
             req = parse_powershell_command(QApplication.clipboard().text())
             if req is not None:
                 paste_request_callback(req)
+            else:
+                _show_paste_error(table, 'Could not parse a PowerShell command from the clipboard.')
         elif curl_action is not None and action == curl_action:
             curl_callback()
         elif powershell_action is not None and action == powershell_action:

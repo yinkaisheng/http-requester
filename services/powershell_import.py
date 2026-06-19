@@ -148,6 +148,12 @@ def parse_powershell_command(text: str) -> Optional[HttpRequest]:
     if body_type == BodyType.RAW and body_text:
         body_type = _detect_json_body(body_text, headers)
 
+    if method == 'GET' and (
+        (body_type in (BodyType.RAW, BodyType.JSON) and body_text)
+        or (body_type == BodyType.FORM and form_fields)
+    ):
+        method = 'POST'
+
     return normalize_imported_file_paths(
         HttpRequest(
             method=method,

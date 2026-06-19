@@ -18,6 +18,7 @@ TAB_CLOSE_BUTTON_TEXT = '\u00d7'
 
 class RequestTabWidget(QTabWidget):
     tab_title_changed = pyqtSignal()
+    workspace_changed = pyqtSignal()
     record_saved = pyqtSignal(object)
     record_renamed = pyqtSignal(str, str)
 
@@ -36,6 +37,7 @@ class RequestTabWidget(QTabWidget):
         self.tabBar().setContextMenuPolicy(Qt.CustomContextMenu)
         self.tabBar().customContextMenuRequested.connect(self._on_tab_context_menu)
         self.tabBar().tabMoved.connect(self._rebuild_map)
+        self.tabBar().tabMoved.connect(self.workspace_changed.emit)
         self.tabBarDoubleClicked.connect(self._on_tab_bar_double_clicked)
 
     def addTab(self, widget: QWidget, label: str) -> int:
@@ -80,6 +82,7 @@ class RequestTabWidget(QTabWidget):
         tab.apply_default_splitter_sizes()
         index = self.addTab(tab, tab.tab_title())
         self.setCurrentIndex(index)
+        self.workspace_changed.emit()
         return tab
 
     def _create_tab(
@@ -116,6 +119,7 @@ class RequestTabWidget(QTabWidget):
             self.setCurrentIndex(current_index)
         elif self.count() > 0:
             self.setCurrentIndex(0)
+        self.workspace_changed.emit()
 
     def get_session_state(self) -> dict:
         tabs = []
@@ -168,6 +172,7 @@ class RequestTabWidget(QTabWidget):
         self.removeTab(index)
         self._rebuild_map()
         self._ensure_at_least_one_tab()
+        self.workspace_changed.emit()
 
     def _on_tab_bar_double_clicked(self, index: int) -> None:
         if index >= 0:
@@ -210,6 +215,7 @@ class RequestTabWidget(QTabWidget):
             widget.set_draft_name(new_name)
         self.setTabText(index, widget.tab_title())
         self.tab_title_changed.emit()
+        self.workspace_changed.emit()
 
     def update_tab_title_for_record(self, record_id: str, new_name: str) -> None:
         if record_id not in self._record_tab_map:
@@ -223,6 +229,7 @@ class RequestTabWidget(QTabWidget):
         widget.apply_record_name(new_name)
         self.setTabText(index, widget.tab_title())
         self.tab_title_changed.emit()
+        self.workspace_changed.emit()
 
     def _rebuild_map(self) -> None:
         self._record_tab_map.clear()
@@ -242,3 +249,4 @@ class RequestTabWidget(QTabWidget):
                 break
         self._rebuild_map()
         self.tab_title_changed.emit()
+        self.workspace_changed.emit()

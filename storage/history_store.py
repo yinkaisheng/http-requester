@@ -33,6 +33,22 @@ class HistoryStore:
     def _record_path(self, record_id: str) -> Path:
         return self.records_dir / f'{record_id}.json'
 
+    def _prune_index_entries(self, entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        valid: List[Dict[str, Any]] = []
+        changed = False
+        for entry in entries:
+            record_id = entry.get('id')
+            if not record_id:
+                changed = True
+                continue
+            if not self._record_path(record_id).exists():
+                changed = True
+                continue
+            valid.append(entry)
+        if changed:
+            self._save_index_entries(valid)
+        return valid
+
     def _load_index_entries(self) -> List[Dict[str, Any]]:
         if self._index_cache is not None:
             return self._index_cache
@@ -49,6 +65,7 @@ class HistoryStore:
         if not isinstance(entries, list):
             entries = []
         entries.sort(key=lambda e: e.get('created_at', ''), reverse=True)
+        entries = self._prune_index_entries(entries)
         self._index_cache = entries
         return self._index_cache
 
@@ -78,7 +95,7 @@ class HistoryStore:
             'method': record.request.method,
             'url': record.request.url,
             'created_at': record.created_at,
-            'last_status': record.last_status,
+            'status_code': record.status_code,
         }
 
     def _record_from_index_entry(self, entry: Dict[str, Any]) -> HistoryRecord:
@@ -91,7 +108,7 @@ class HistoryStore:
             ),
             created_at=entry.get('created_at', ''),
             updated_at=entry.get('created_at', ''),
-            last_status=entry.get('last_status'),
+            status_code=entry.get('status_code'),
         )
 
     def load(self) -> List[HistoryRecord]:
@@ -150,7 +167,6 @@ class HistoryStore:
     def delete_many(self, record_ids: List[str]) -> List[str]:
         if not record_ids:
             return []
-        id_set = set(record_ids)
         entries = self._load_index_entries()
         existing_ids = {e.get('id') for e in entries}
         to_delete = [rid for rid in record_ids if rid in existing_ids]

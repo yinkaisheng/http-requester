@@ -183,7 +183,7 @@ class BodyEditor(QWidget):
         is_file_btn.setCheckable(True)
         is_file_btn.setChecked(field.is_file if field else False)
         is_file_btn.setFixedSize(32, cell_height)
-        is_file_btn.toggled.connect(lambda checked, r=row: self._on_file_toggle(r, checked))
+        is_file_btn.toggled.connect(self._on_file_toggle_from_sender)
         is_file_layout.addWidget(is_file_btn, 0, Qt.AlignCenter)
         self.form_table.setCellWidget(row, 2, is_file_widget)
 
@@ -200,13 +200,40 @@ class BodyEditor(QWidget):
         browse_btn = QPushButton('...')
         browse_btn.setObjectName('formCellButton')
         browse_btn.setFixedSize(32, cell_height)
-        browse_btn.clicked.connect(lambda _=False, r=row: self._browse_form_file(r))
+        browse_btn.clicked.connect(self._browse_form_file_from_sender)
         path_layout.addWidget(path_edit, 1)
         path_layout.addWidget(browse_btn, 0, Qt.AlignCenter)
         self.form_table.setCellWidget(row, 3, path_widget)
 
         if field and field.is_file:
             value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
+
+    def _row_for_cell_widget(self, widget: QWidget) -> int:
+        target = widget
+        while target is not None and target is not self.form_table:
+            for row in range(self.form_table.rowCount()):
+                for col in (2, 3):
+                    cell = self.form_table.cellWidget(row, col)
+                    if cell is target:
+                        return row
+            target = target.parentWidget()
+        return -1
+
+    def _on_file_toggle_from_sender(self, checked: bool) -> None:
+        sender = self.sender()
+        if sender is None:
+            return
+        row = self._row_for_cell_widget(sender)
+        if row >= 0:
+            self._on_file_toggle(row, checked)
+
+    def _browse_form_file_from_sender(self) -> None:
+        sender = self.sender()
+        if sender is None:
+            return
+        row = self._row_for_cell_widget(sender)
+        if row >= 0:
+            self._browse_form_file(row)
 
     def _on_file_toggle(self, row: int, is_file: bool) -> None:
         widget = self.form_table.cellWidget(row, 2)

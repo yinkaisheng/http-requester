@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+import base64
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -23,6 +24,46 @@ DEFAULT_REQUEST_TIMEOUT_SECONDS = 30
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_body_type(value: Any) -> BodyType:
+    try:
+        return BodyType(value)
+    except (ValueError, TypeError):
+        return BodyType.RAW
+
+
+def is_text_body(body: bytes) -> bool:
+    if not body:
+        return True
+    if b'\x00' in body:
+        return False
+    for encoding in ('utf-8', 'gbk'):
+        try:
+            body.decode(encoding)
+            return True
+        except UnicodeDecodeError:
+            continue
+    return False
+
+
+def encode_response_body_for_storage(body: str, raw_body: bytes) -> tuple[str, bool]:
+    """Return (stored_body, is_binary). Binary payloads are base64-encoded."""
+    if is_text_body(raw_body):
+        return body, False
+    return base64.b64encode(raw_body).decode('ascii'), True
+
+
+def decode_stored_response_body(body: str, is_binary: bool) -> str:
+    if not is_binary:
+        return body
+    if not body:
+        return ''
+    try:
+        data = base64.b64decode(body)
+    except Exception:
+        return body
+    return f'[Binary data, {len(data)} bytes]'
 
 
 @dataclass
@@ -106,7 +147,7 @@ class HttpRequest:
             method=data.get('method', 'GET'),
             url=data.get('url', ''),
             headers=[HeaderItem.from_dict(h) for h in data.get('headers', [])],
-            body_type=BodyType(data.get('body_type', BodyType.RAW.value)),
+            body_type=_parse_body_type(data.get('body_type', BodyType.RAW.value)),
             body_text=data.get('body_text', ''),
             form_fields=[FormField.from_dict(f) for f in data.get('form_fields', [])],
             file_path=data.get('file_path', ''),
@@ -148,11 +189,12 @@ class HistoryRecord:
     sent_headers: Dict[str, str] = field(default_factory=dict)
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
-    last_status: Optional[int] = None
-    last_status_reason: str = ''
-    last_elapsed_ms: Optional[float] = None
+    status_code: Optional[int] = None
+    status_reason: str = ''
+    elapsed_ms: Optional[float] = None
     response_headers: Dict[str, str] = field(default_factory=dict)
     response_body: str = ''
+    response_body_is_binary: bool = False
 
     def display_name(self) -> str:
         if self.name:
@@ -165,8 +207,8 @@ class HistoryRecord:
 
     def list_text(self) -> str:
         text = f'{self.request.method} {self.display_name()}'
-        if self.last_status is not None:
-            text += f' [{self.last_status}]'
+        if self.status_code is not None:
+            text += f' [{self.status_code}]'
         return text
 
     def to_dict(self) -> Dict[str, Any]:
@@ -177,11 +219,12 @@ class HistoryRecord:
             'sent_headers': dict(self.sent_headers),
             'created_at': self.created_at,
             'updated_at': self.updated_at,
-            'last_status': self.last_status,
-            'last_status_reason': self.last_status_reason,
-            'last_elapsed_ms': self.last_elapsed_ms,
+            'status_code': self.status_code,
+            'status_reason': self.status_reason,
+            'elapsed_ms': self.elapsed_ms,
             'response_headers': dict(self.response_headers),
             'response_body': self.response_body,
+            'response_body_is_binary': self.response_body_is_binary,
         }
 
     @classmethod
@@ -193,9 +236,10 @@ class HistoryRecord:
             sent_headers=dict(data.get('sent_headers', {})),
             created_at=data.get('created_at', _now_iso()),
             updated_at=data.get('updated_at', _now_iso()),
-            last_status=data.get('last_status'),
-            last_status_reason=data.get('last_status_reason', ''),
-            last_elapsed_ms=data.get('last_elapsed_ms'),
+            status_code=data.get('status_code'),
+            status_reason=data.get('status_reason', ''),
+            elapsed_ms=data.get('elapsed_ms'),
             response_headers=dict(data.get('response_headers', {})),
             response_body=data.get('response_body', ''),
+            response_body_is_binary=data.get('response_body_is_binary', False),
         )

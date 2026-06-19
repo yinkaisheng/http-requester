@@ -49,6 +49,10 @@ class MainWindow(QMainWindow):
         self.session_store = SessionStore()
         self.async_task = AsyncTask()
         self.async_task.debugPrint = False
+        self._session_save_timer = QTimer(self)
+        self._session_save_timer.setSingleShot(True)
+        self._session_save_timer.setInterval(500)
+        self._session_save_timer.timeout.connect(self._save_session)
         self.setWindowTitle('HTTP Requester')
         self._main_splitter: Optional[QSplitter] = None
         self._body_text_font_size = default_body_text_font_size_px()
@@ -111,6 +115,13 @@ class MainWindow(QMainWindow):
         self.history_panel.record_renamed.connect(self._on_record_renamed)
         self.request_tabs.record_renamed.connect(self._on_record_renamed)
         self.request_tabs.record_saved.connect(self._on_record_saved)
+        self.request_tabs.currentChanged.connect(self._schedule_session_save)
+        self.request_tabs.tab_title_changed.connect(self._schedule_session_save)
+        self.request_tabs.workspace_changed.connect(self._schedule_session_save)
+        self.request_tabs.record_saved.connect(self._schedule_session_save)
+
+    def _schedule_session_save(self, *_args) -> None:
+        self._session_save_timer.start()
 
     def _on_record_renamed(self, record_id: str, new_name: str) -> None:
         self.history_panel.update_record_name(record_id, new_name)

@@ -154,17 +154,27 @@ def send_request(req: HttpRequest) -> HttpResponse:
     except requests.RequestException as exc:
         request_headers: Dict[str, str] = {}
         if exc.response is not None:
-            request_headers = _actual_request_headers(exc.response)
-            resp_headers = dict(exc.response.headers)
-            resp_body = exc.response.content
+            response = exc.response
+            request_headers = _actual_request_headers(response)
+            resp_headers = dict(response.headers)
+            resp_body = response.content
+            elapsed_ms = response.elapsed.total_seconds() * 1000
             logger.error(
                 f'HTTP {method} {url} failed: {exc}\n'
-                f'status_code: {exc.response.status_code}\n'
+                f'status_code: {response.status_code}\n'
                 f'Response headers:\n{_format_headers(resp_headers)}\n'
                 f'Response body:\n{_body_for_log(resp_body)}'
             )
-        else:
-            logger.error(f'HTTP {method} {url} failed: {exc!r}')
+            return HttpResponse(
+                status_code=response.status_code,
+                reason=response.reason or '',
+                headers=resp_headers,
+                body=resp_body,
+                elapsed_ms=elapsed_ms,
+                error=repr(exc),
+                request_headers=request_headers,
+            )
+        logger.error(f'HTTP {method} {url} failed: {exc!r}')
         return HttpResponse(error=repr(exc), request_headers=request_headers)
     finally:
         for f in opened_files:

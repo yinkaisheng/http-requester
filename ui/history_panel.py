@@ -128,7 +128,23 @@ class HistoryPanel(QWidget):
     def prepend_record(self, record: HistoryRecord) -> None:
         self._records = [r for r in self._records if r.id != record.id]
         self._records.insert(0, record)
-        self._rebuild_list()
+
+        for index in range(self.list_widget.count()):
+            item = self.list_widget.item(index)
+            if item.data(Qt.UserRole) == record.id:
+                self.list_widget.takeItem(index)
+                self._item_widgets.pop(record.id, None)
+                break
+
+        item = QListWidgetItem()
+        item.setData(Qt.UserRole, record.id)
+        item.setSizeHint(QSize(0, 36))
+        widget = HistoryItemWidget(record.list_text())
+        widget.clicked.connect(lambda rid=record.id: self.record_selected.emit(rid))
+        widget.delete_clicked.connect(lambda rid=record.id: self._delete_record(rid, confirm=False))
+        self.list_widget.insertItem(0, item)
+        self.list_widget.setItemWidget(item, widget)
+        self._item_widgets[record.id] = widget
 
     def update_record_name(self, record_id: str, new_name: str) -> None:
         for record in self._records:
