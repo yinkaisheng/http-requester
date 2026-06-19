@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import os
 import sys
 from pathlib import Path
 
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QStyleFactory
 
-hpath = Path(__file__).resolve().parent / 'Lib' / 'http-requester'
-sys.path.append(str(hpath)) # need for building portable release
-# print(f"Added {hpath} to sys.path")
-
 from log_util import config_logger, logger
+
+exe_path = Path(sys.executable)
+if sys.platform == 'win32' and 'python' not in exe_path.name.lower():
+    os.chdir(exe_path.parent) # sys.executable is HttpRequester.exe
+    config_logger(logger, log_dir='logs', log_file='http-requester.log')
+else:
+    os.chdir(Path(__file__).parent)
+    config_logger(logger)
+
 from storage.session_store import SessionStore
 from ui.main_window import MainWindow
 from ui.theme import (
@@ -22,17 +28,18 @@ from ui.theme import (
     normalize_theme_name,
 )
 
-APP_ICON_PATH = Path(__file__).resolve().parent / 'web.ico'
-
 
 def _load_app_icon() -> QIcon:
+    APP_ICON_PATH = Path(__file__).parent / 'web.ico'
     if APP_ICON_PATH.is_file():
         return QIcon(str(APP_ICON_PATH))
     return QIcon()
 
 
 def main():
-    config_logger(logger)
+    logger.info(f'========================================\n\n')
+    logger.info(f'sys.executable={sys.executable}, working directory={os.getcwd()}')
+    logger.info(f'__file__={__file__}, argv={sys.argv}')
     app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create('Fusion'))
     app.setApplicationName('HTTP Requester')

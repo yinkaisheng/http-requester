@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from log_util import logger
 from models.http_models import HistoryRecord, HttpRequest
-from storage.paths import HISTORY_INDEX_FILE, RECORDS_DIR, STORAGE_VERSION
+from storage.paths import HISTORY_FILE, RECORDS_DIR, STORAGE_VERSION
 
 
 class HistoryStore:
@@ -19,7 +19,7 @@ class HistoryStore:
         records_dir: Optional[Path] = None,
     ):
         if index_path is None:
-            index_path = HISTORY_INDEX_FILE
+            index_path = HISTORY_FILE
         if records_dir is None:
             records_dir = RECORDS_DIR
         self.index_path = index_path

@@ -91,6 +91,7 @@ def prompt_editor_settings(
 
     layout = QFormLayout(dialog)
     family_combo = ArrowFontComboBox()
+    family_combo.setEditable(False)
     family_combo.setFontFilters(QFontComboBox.MonospacedFonts)
     family_combo.setMinimumWidth(min_width - 48)
     _select_monospace_family(family_combo, current_family)
