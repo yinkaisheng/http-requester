@@ -157,10 +157,29 @@ def normalize_theme_name(theme: str | None) -> ThemeName:
     return THEME_SOLARIZED
 
 
-def _body_text_font_family() -> str:
+def default_body_text_font_family() -> str:
     if sys.platform == 'win32':
-        return f'{BODY_TEXT_FONT_FAMILY_WIN}, "Courier New", monospace'
-    return ', '.join(f'"{name}"' if ' ' in name else name for name in BODY_TEXT_FONT_FALLBACKS)
+        return BODY_TEXT_FONT_FAMILY_WIN
+    return BODY_TEXT_FONT_FALLBACKS[0]
+
+
+def normalize_body_text_font_family(value) -> str:
+    if isinstance(value, str):
+        name = value.strip().replace('"', '')
+        if name:
+            return name
+    return default_body_text_font_family()
+
+
+def body_text_font_family_css(family: str | None = None) -> str:
+    name = normalize_body_text_font_family(family)
+    primary = f'"{name}"' if ' ' in name else name
+    fallbacks = ', '.join(
+        f'"{fallback}"' if ' ' in fallback else fallback
+        for fallback in BODY_TEXT_FONT_FALLBACKS
+        if fallback != name
+    )
+    return f'{primary}, {fallbacks}, monospace'
 
 
 def apply_app_font(app: QApplication) -> None:
@@ -189,9 +208,12 @@ def apply_app_theme(
     app: QApplication,
     theme: str | None = THEME_SOLARIZED,
     body_text_font_size: int | None = None,
+    body_text_font_family: str | None = None,
 ) -> None:
     palette = THEME_PALETTES[normalize_theme_name(theme)]
-    app.setStyleSheet(_build_stylesheet(app.font(), palette, body_text_font_size))
+    app.setStyleSheet(
+        _build_stylesheet(app.font(), palette, body_text_font_size, body_text_font_family)
+    )
 
 
 def resolve_ui_font_size_px(font: QFont | None = None) -> int:
@@ -220,13 +242,14 @@ def _build_stylesheet(
     font: QFont,
     palette: ThemePalette,
     body_text_font_size: int | None = None,
+    body_text_font_family: str | None = None,
 ) -> str:
     size_px = resolve_ui_font_size_px(font)
     if body_text_font_size is None:
         resolved_body_text_font_size = size_px + BODY_TEXT_FONT_DELTA_PX
     else:
         resolved_body_text_font_size = normalize_body_text_font_size(body_text_font_size, font)
-    body_text_font_family = _body_text_font_family()
+    body_text_font_family = body_text_font_family_css(body_text_font_family)
     ui_font_family = font.family().replace('"', '\\"')
     p = palette
     return f'''

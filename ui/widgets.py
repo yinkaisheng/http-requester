@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QFontComboBox,
     QListView,
     QSpinBox,
     QStyle,
@@ -82,6 +83,41 @@ def _paint_triangle(
     painter.drawPolygon(QPolygon(points))
 
 
+def _paint_combo_dropdown_arrow(combo: QComboBox) -> None:
+    opt = QStyleOptionComboBox()
+    combo.initStyleOption(opt)
+    style = combo.style()
+    arrow_rect = style.subControlRect(
+        QStyle.CC_ComboBox, opt, QStyle.SC_ComboBoxArrow, combo
+    )
+    if arrow_rect.isNull() or arrow_rect.width() < 2:
+        arrow_rect = QRect(
+            combo.width() - COMBO_DROPDOWN_WIDTH_PX,
+            0,
+            COMBO_DROPDOWN_WIDTH_PX,
+            combo.height(),
+        )
+    if arrow_rect.isNull() or arrow_rect.width() < 2:
+        return
+
+    center = QRectF(arrow_rect).center()
+    painter = QPainter(combo)
+    try:
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(_arrow_color(combo))
+        _paint_triangle(
+            painter,
+            center.x(),
+            center.y(),
+            ARROW_GLYPH_BASE_PX,
+            ARROW_GLYPH_HEIGHT_PX,
+            up=False,
+        )
+    finally:
+        painter.end()
+
+
 class _AppFontItemDelegate(QStyledItemDelegate):
     """Force combo popup rows to use the same pixel size as global QSS."""
 
@@ -120,38 +156,15 @@ class ArrowComboBox(QComboBox):
 
     def paintEvent(self, event: 'QPaintEvent') -> None:
         super().paintEvent(event)
-        opt = QStyleOptionComboBox()
-        self.initStyleOption(opt)
-        style = self.style()
-        arrow_rect = style.subControlRect(
-            QStyle.CC_ComboBox, opt, QStyle.SC_ComboBoxArrow, self
-        )
-        if arrow_rect.isNull() or arrow_rect.width() < 2:
-            arrow_rect = QRect(
-                self.width() - COMBO_DROPDOWN_WIDTH_PX,
-                0,
-                COMBO_DROPDOWN_WIDTH_PX,
-                self.height(),
-            )
-        if arrow_rect.isNull() or arrow_rect.width() < 2:
-            return
+        _paint_combo_dropdown_arrow(self)
 
-        center = QRectF(arrow_rect).center()
-        painter = QPainter(self)
-        try:
-            painter.setRenderHint(QPainter.Antialiasing, True)
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(_arrow_color(self))
-            _paint_triangle(
-                painter,
-                center.x(),
-                center.y(),
-                ARROW_GLYPH_BASE_PX,
-                ARROW_GLYPH_HEIGHT_PX,
-                up=False,
-            )
-        finally:
-            painter.end()
+
+class ArrowFontComboBox(QFontComboBox):
+    """Monospace font picker with a painted dropdown glyph."""
+
+    def paintEvent(self, event: 'QPaintEvent') -> None:
+        super().paintEvent(event)
+        _paint_combo_dropdown_arrow(self)
 
 
 class GlyphSpinBox(QSpinBox):

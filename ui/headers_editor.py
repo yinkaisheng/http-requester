@@ -143,6 +143,7 @@ def attach_header_table_menu(
     paste_request_callback: Optional[Callable[[HttpRequest], None]] = None,
     curl_callback: Optional[Callable[[], None]] = None,
     powershell_callback: Optional[Callable[[], None]] = None,
+    delete_row_callback: Optional[Callable[[int], None]] = None,
 ) -> None:
     table.setContextMenuPolicy(Qt.CustomContextMenu)
 
@@ -153,6 +154,10 @@ def attach_header_table_menu(
         copy_action = menu.addAction('Copy Header')
         copy_action.setEnabled(row >= 0)
         copy_all_action = menu.addAction('Copy All Headers')
+        delete_action = None
+        if delete_row_callback is not None:
+            delete_action = menu.addAction('Delete Header')
+            delete_action.setEnabled(row >= 0)
         paste_action = None
         paste_curl_action = None
         paste_powershell_action = None
@@ -185,6 +190,9 @@ def attach_header_table_menu(
             value = value_item.text() if value_item else ''
             if key:
                 _copy_to_clipboard(format_header_line(key, value))
+        elif delete_action is not None and action == delete_action:
+            if row >= 0:
+                delete_row_callback(row)
         elif action == copy_all_action:
             text = format_headers_text(_read_table_rows(table, key_col, value_col))
             if text:
@@ -332,6 +340,7 @@ class RawHeadersEditor(QWidget):
             paste_request_callback=self._paste_request_callback,
             curl_callback=self._curl_copy_callback,
             powershell_callback=self._powershell_copy_callback,
+            delete_row_callback=self._delete_row,
         )
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 2, 0, 0)
@@ -404,6 +413,13 @@ class RawHeadersEditor(QWidget):
                     if toggle:
                         toggle.setChecked(True)
                     key_to_row[lower_key] = empty_row
+
+    def _delete_row(self, row: int) -> None:
+        if row < 0 or row >= self.table.rowCount():
+            return
+        self.table.removeRow(row)
+        if self.table.rowCount() == 0:
+            self._add_row()
 
     def _remove_selected_rows(self) -> None:
         rows = sorted({idx.row() for idx in self.table.selectedIndexes()}, reverse=True)

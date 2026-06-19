@@ -21,7 +21,7 @@ from pyqt_async_task import AsyncTask
 from storage.history_store import HistoryStore
 from models.http_models import HistoryRecord
 from storage.session_store import SessionStore
-from ui.dialogs import prompt_body_text_font_size
+from ui.dialogs import prompt_editor_settings
 from ui.history_panel import HistoryPanel
 from ui.request_tab import splitter_ratio_to_sizes, splitter_sizes_to_ratio
 from ui.request_tab_widget import RequestTabWidget
@@ -30,8 +30,10 @@ from ui.theme import (
     THEME_LABELS,
     THEME_OPTIONS,
     apply_app_theme,
+    default_body_text_font_family,
     default_body_text_font_size_px,
     migrate_session_theme,
+    normalize_body_text_font_family,
     normalize_body_text_font_size,
     normalize_theme_name,
 )
@@ -56,6 +58,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle('HTTP Requester')
         self._main_splitter: Optional[QSplitter] = None
         self._body_text_font_size = default_body_text_font_size_px()
+        self._body_text_font_family = default_body_text_font_family()
         self._init_ui()
         self._connect_signals()
         self._restore_session()
@@ -139,6 +142,7 @@ class MainWindow(QMainWindow):
         self.theme_combo.setCurrentIndex(theme_index)
         self.theme_combo.blockSignals(False)
         self._body_text_font_size = normalize_body_text_font_size(session.get('body_text_font_size'))
+        self._body_text_font_family = normalize_body_text_font_family(session.get('body_text_font_family'))
         self._apply_appearance()
 
         width = window.get('width', self.DEFAULT_WIDTH)
@@ -195,6 +199,7 @@ class MainWindow(QMainWindow):
             'theme': self._current_theme(),
             'theme_version': CURRENT_THEME_VERSION,
             'body_text_font_size': self._body_text_font_size,
+            'body_text_font_family': self._body_text_font_family,
             'window': window_state,
             'tabs': tab_state.get('tabs', []),
             'current_tab_index': tab_state.get('current_tab_index', 0),
@@ -214,13 +219,28 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app is None:
             return
-        apply_app_theme(app, self._current_theme(), self._body_text_font_size)
+        apply_app_theme(
+            app,
+            self._current_theme(),
+            self._body_text_font_size,
+            self._body_text_font_family,
+        )
 
     def _on_settings_clicked(self) -> None:
-        new_size = prompt_body_text_font_size(self, self._body_text_font_size)
-        if new_size is None or new_size == self._body_text_font_size:
+        settings = prompt_editor_settings(
+            self,
+            self._body_text_font_size,
+            self._body_text_font_family,
+        )
+        if settings is None:
             return
-        self._body_text_font_size = new_size
+        if (
+            settings.size == self._body_text_font_size
+            and settings.family == self._body_text_font_family
+        ):
+            return
+        self._body_text_font_size = settings.size
+        self._body_text_font_family = settings.family
         self._apply_appearance()
         self._save_session()
 
