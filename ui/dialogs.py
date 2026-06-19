@@ -12,6 +12,12 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from ui.widgets import GlyphSpinBox
+from ui.theme import (
+    BODY_TEXT_FONT_SIZE_MAX,
+    BODY_TEXT_FONT_SIZE_MIN,
+)
+
 
 def prompt_text(
     parent: QWidget,
@@ -42,3 +48,32 @@ def prompt_text(
         return None
     text = edit.text().strip()
     return text or None
+
+
+def prompt_body_text_font_size(
+    parent: QWidget,
+    current: int,
+    *,
+    min_width: int = 400,
+) -> Optional[int]:
+    dialog = QDialog(parent)
+    dialog.setWindowTitle('Settings')
+    dialog.setMinimumWidth(min_width)
+
+    layout = QFormLayout(dialog)
+    spin = GlyphSpinBox()
+    spin.setRange(BODY_TEXT_FONT_SIZE_MIN, BODY_TEXT_FONT_SIZE_MAX)
+    spin.setValue(current)
+    spin.setMinimumWidth(120)
+    layout.addRow('Editor font size (px)', spin)
+
+    buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=dialog)
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+    layout.addRow(buttons)
+
+    spin.setFocus()
+
+    if dialog.exec_() != QDialog.Accepted:
+        return None
+    return spin.value()

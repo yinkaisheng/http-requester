@@ -20,6 +20,8 @@ SOL_VIOLET = '#6c71c4'
 
 FONT_SIZE_DELTA_PX = 2
 BODY_TEXT_FONT_DELTA_PX = 4
+BODY_TEXT_FONT_SIZE_MIN = 8
+BODY_TEXT_FONT_SIZE_MAX = 48
 BODY_TEXT_FONT_FAMILY_WIN = 'Consolas'
 BODY_TEXT_FONT_FALLBACKS = ('Cascadia Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace')
 
@@ -172,9 +174,24 @@ def apply_app_font(app: QApplication) -> None:
     app.setFont(base_font)
 
 
-def apply_app_theme(app: QApplication, theme: str | None = THEME_SOLARIZED) -> None:
+def default_body_text_font_size_px(font: QFont | None = None) -> int:
+    return resolve_ui_font_size_px(font) + BODY_TEXT_FONT_DELTA_PX
+
+
+def normalize_body_text_font_size(value, font: QFont | None = None) -> int:
+    default = default_body_text_font_size_px(font)
+    if not isinstance(value, int) or value < BODY_TEXT_FONT_SIZE_MIN or value > BODY_TEXT_FONT_SIZE_MAX:
+        return default
+    return value
+
+
+def apply_app_theme(
+    app: QApplication,
+    theme: str | None = THEME_SOLARIZED,
+    body_text_font_size: int | None = None,
+) -> None:
     palette = THEME_PALETTES[normalize_theme_name(theme)]
-    app.setStyleSheet(_build_stylesheet(app.font(), palette))
+    app.setStyleSheet(_build_stylesheet(app.font(), palette, body_text_font_size))
 
 
 def resolve_ui_font_size_px(font: QFont | None = None) -> int:
@@ -199,9 +216,16 @@ def popup_list_font(font: QFont | None = None) -> QFont:
     return ui_font
 
 
-def _build_stylesheet(font: QFont, palette: ThemePalette) -> str:
+def _build_stylesheet(
+    font: QFont,
+    palette: ThemePalette,
+    body_text_font_size: int | None = None,
+) -> str:
     size_px = resolve_ui_font_size_px(font)
-    body_text_font_size = size_px + BODY_TEXT_FONT_DELTA_PX
+    if body_text_font_size is None:
+        resolved_body_text_font_size = size_px + BODY_TEXT_FONT_DELTA_PX
+    else:
+        resolved_body_text_font_size = normalize_body_text_font_size(body_text_font_size, font)
     body_text_font_family = _body_text_font_family()
     ui_font_family = font.family().replace('"', '\\"')
     p = palette
@@ -407,6 +431,28 @@ QPushButton#primaryButton:pressed {{
     background-color: {p.accent_pressed};
 }}
 
+QToolButton#settingsButton {{
+    background-color: {p.surface};
+    border: 1px solid {p.border};
+    border-radius: 3px;
+    color: {p.window_fg};
+    padding: 0;
+    min-width: 28px;
+    max-width: 28px;
+    min-height: 24px;
+    max-height: 24px;
+    font-size: {max(size_px + 2, 14)}px;
+}}
+
+QToolButton#settingsButton:hover {{
+    background-color: {p.hover_bg};
+    border-color: {p.border_strong};
+}}
+
+QToolButton#settingsButton:pressed {{
+    background-color: {p.surface_alt};
+}}
+
 QPushButton#historyDeleteButton {{
     background-color: transparent;
     border: none;
@@ -458,7 +504,7 @@ QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus, QSpinBox:focus {{
 
 QPlainTextEdit#bodyTextEdit {{
     font-family: {body_text_font_family};
-    font-size: {body_text_font_size}px;
+    font-size: {resolved_body_text_font_size}px;
 }}
 
 QComboBox::drop-down {{

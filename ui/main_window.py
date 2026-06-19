@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QMainWindow,
     QPushButton,
     QSplitter,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -20,6 +21,7 @@ from pyqt_async_task import AsyncTask
 from storage.history_store import HistoryStore
 from models.http_models import HistoryRecord
 from storage.session_store import SessionStore
+from ui.dialogs import prompt_body_text_font_size
 from ui.history_panel import HistoryPanel
 from ui.request_tab import splitter_ratio_to_sizes, splitter_sizes_to_ratio
 from ui.request_tab_widget import RequestTabWidget
@@ -28,7 +30,9 @@ from ui.theme import (
     THEME_LABELS,
     THEME_OPTIONS,
     apply_app_theme,
+    default_body_text_font_size_px,
     migrate_session_theme,
+    normalize_body_text_font_size,
     normalize_theme_name,
 )
 from ui.widgets import ArrowComboBox
@@ -47,6 +51,7 @@ class MainWindow(QMainWindow):
         self.async_task.debugPrint = False
         self.setWindowTitle('HTTP Requester')
         self._main_splitter: Optional[QSplitter] = None
+        self._body_text_font_size = default_body_text_font_size_px()
         self._init_ui()
         self._connect_signals()
         self._restore_session()
@@ -72,6 +77,13 @@ class MainWindow(QMainWindow):
             self.theme_combo.addItem(THEME_LABELS[theme_name], theme_name)
         self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
         top_layout.addWidget(self.theme_combo)
+
+        self.settings_btn = QToolButton()
+        self.settings_btn.setObjectName('settingsButton')
+        self.settings_btn.setText('\u2699')
+        self.settings_btn.setToolTip('Settings')
+        self.settings_btn.clicked.connect(self._on_settings_clicked)
+        top_layout.addWidget(self.settings_btn)
         top_layout.addStretch()
 
         self._main_splitter = QSplitter(Qt.Horizontal)
@@ -115,7 +127,8 @@ class MainWindow(QMainWindow):
         self.theme_combo.blockSignals(True)
         self.theme_combo.setCurrentIndex(theme_index)
         self.theme_combo.blockSignals(False)
-        apply_app_theme(QApplication.instance(), theme)
+        self._body_text_font_size = normalize_body_text_font_size(session.get('body_text_font_size'))
+        self._apply_appearance()
 
         width = window.get('width', self.DEFAULT_WIDTH)
         height = window.get('height', self.DEFAULT_HEIGHT)
@@ -170,6 +183,7 @@ class MainWindow(QMainWindow):
             'version': 1,
             'theme': self._current_theme(),
             'theme_version': CURRENT_THEME_VERSION,
+            'body_text_font_size': self._body_text_font_size,
             'window': window_state,
             'tabs': tab_state.get('tabs', []),
             'current_tab_index': tab_state.get('current_tab_index', 0),
@@ -185,11 +199,22 @@ class MainWindow(QMainWindow):
     def _current_theme(self) -> str:
         return normalize_theme_name(self.theme_combo.currentData())
 
-    def _on_theme_changed(self, _index: int) -> None:
+    def _apply_appearance(self) -> None:
         app = QApplication.instance()
         if app is None:
             return
-        apply_app_theme(app, self._current_theme())
+        apply_app_theme(app, self._current_theme(), self._body_text_font_size)
+
+    def _on_settings_clicked(self) -> None:
+        new_size = prompt_body_text_font_size(self, self._body_text_font_size)
+        if new_size is None or new_size == self._body_text_font_size:
+            return
+        self._body_text_font_size = new_size
+        self._apply_appearance()
+        self._save_session()
+
+    def _on_theme_changed(self, _index: int) -> None:
+        self._apply_appearance()
         self._save_session()
 
     def _on_record_selected(self, record_id: str) -> None:

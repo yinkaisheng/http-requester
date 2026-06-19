@@ -17,6 +17,7 @@ from ui.theme import (
     apply_app_font,
     apply_app_theme,
     migrate_session_theme,
+    normalize_body_text_font_size,
     normalize_theme_name,
 )
 
@@ -41,8 +42,9 @@ def main():
     theme = normalize_theme_name(
         migrate_session_theme(session.get('theme'), session.get('theme_version'))
     )
+    body_text_font_size = normalize_body_text_font_size(session.get('body_text_font_size'))
     apply_app_font(app)
-    apply_app_theme(app, theme)
+    apply_app_theme(app, theme, body_text_font_size)
     window = MainWindow()
     if not icon.isNull():
         window.setWindowIcon(icon)
