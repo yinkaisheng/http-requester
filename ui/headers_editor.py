@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List, Optional, Tuple
 
-from PyQt5.QtCore import QPointF, QPoint, Qt
-from PyQt5.QtGui import QClipboard, QFontMetrics, QPaintEvent, QPainter, QPen
+from PyQt5.QtCore import QPointF, QPoint, Qt, QEvent
+from PyQt5.QtGui import QClipboard, QFontMetrics, QKeyEvent, QPaintEvent, QPainter, QPen
 from PyQt5.QtWidgets import (
     QApplication,
     QAbstractItemView,
@@ -346,6 +346,7 @@ class RawHeadersEditor(QWidget):
             powershell_callback=self._powershell_copy_callback,
             delete_row_callback=self._delete_row,
         )
+        self.table.installEventFilter(self)
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 2, 0, 0)
         btn_layout.setSpacing(6)
@@ -360,6 +361,21 @@ class RawHeadersEditor(QWidget):
         layout.addLayout(btn_layout, 0)
 
         self._add_row()
+
+    def eventFilter(self, obj, event) -> bool:
+        if obj is self.table and event.type() == QEvent.KeyPress:
+            key_event = event
+            if (
+                isinstance(key_event, QKeyEvent)
+                and key_event.key() == Qt.Key_Delete
+                and self.table.state() != QAbstractItemView.EditingState
+                and (self.table.hasFocus() or self.table.viewport().hasFocus())
+            ):
+                row = self.table.currentRow()
+                if row >= 0:
+                    self._delete_row(row)
+                    return True
+        return super().eventFilter(obj, event)
 
     def _add_row(self, item: Optional[HeaderItem] = None) -> None:
         row = self.table.rowCount()

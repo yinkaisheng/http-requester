@@ -26,6 +26,14 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def url_without_query(url: str) -> str:
+    url = url.strip()
+    query_index = url.find('?')
+    if query_index >= 0:
+        return url[:query_index]
+    return url
+
+
 def _parse_body_type(value: Any) -> BodyType:
     try:
         return BodyType(value)
@@ -155,6 +163,18 @@ class HttpRequest:
             timeout_seconds=timeout,
         )
 
+    def has_body(self) -> bool:
+        if self.body_type in (BodyType.RAW, BodyType.JSON):
+            return bool(self.body_text.strip())
+        if self.body_type == BodyType.FORM:
+            return any(
+                field.key.strip() or field.value or field.file_path
+                for field in self.form_fields
+            )
+        if self.body_type == BodyType.FILE:
+            return bool(self.file_path.strip())
+        return False
+
 
 @dataclass
 class HttpResponse:
@@ -195,6 +215,7 @@ class HistoryRecord:
     response_headers: Dict[str, str] = field(default_factory=dict)
     response_body: str = ''
     response_body_is_binary: bool = False
+    error: str = ''
 
     def display_name(self) -> str:
         if self.name:
@@ -211,6 +232,33 @@ class HistoryRecord:
             text += f' [{self.status_code}]'
         return text
 
+    def item_tooltip(self) -> str:
+        time_text = self.created_at
+        if time_text:
+            try:
+                dt = datetime.fromisoformat(time_text.replace('Z', '+00:00'))
+                if dt.tzinfo is not None:
+                    dt = dt.astimezone()
+                time_text = dt.strftime('%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                pass
+        lines = [time_text, self.full_url()]
+        status_line = self.tooltip_status_line()
+        if status_line:
+            lines.append(status_line)
+        return '\n'.join(lines)
+
+    def tooltip_status_line(self) -> str:
+        if self.status_code:
+            if self.status_reason:
+                return f'{self.status_code} {self.status_reason}'
+            return str(self.status_code)
+        if self.error:
+            return self.error
+        if self.status_reason:
+            return self.status_reason
+        return ''
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             'id': self.id,
@@ -225,6 +273,7 @@ class HistoryRecord:
             'response_headers': dict(self.response_headers),
             'response_body': self.response_body,
             'response_body_is_binary': self.response_body_is_binary,
+            'error': self.error,
         }
 
     @classmethod
@@ -242,4 +291,5 @@ class HistoryRecord:
             response_headers=dict(data.get('response_headers', {})),
             response_body=data.get('response_body', ''),
             response_body_is_binary=data.get('response_body_is_binary', False),
+            error=data.get('error', ''),
         )

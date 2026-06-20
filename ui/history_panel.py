@@ -30,7 +30,12 @@ class HistoryItemWidget(QWidget):
     clicked = pyqtSignal()
     delete_clicked = pyqtSignal()
 
-    def __init__(self, full_text: str, parent: Optional[QWidget] = None):
+    def __init__(
+        self,
+        full_text: str,
+        tooltip: str = '',
+        parent: Optional[QWidget] = None,
+    ):
         super().__init__(parent)
         self._full_text = full_text
 
@@ -49,6 +54,9 @@ class HistoryItemWidget(QWidget):
         self.delete_btn.setToolTip('Delete')
         self.delete_btn.clicked.connect(self.delete_clicked.emit)
         layout.addWidget(self.delete_btn)
+
+        self.setToolTip(tooltip)
+        self.label.setToolTip(tooltip)
 
     def set_full_text(self, text: str) -> None:
         self._full_text = text
@@ -139,7 +147,7 @@ class HistoryPanel(QWidget):
         item = QListWidgetItem()
         item.setData(Qt.UserRole, record.id)
         item.setSizeHint(QSize(0, 36))
-        widget = HistoryItemWidget(record.list_text())
+        widget = HistoryItemWidget(record.list_text(), record.item_tooltip())
         widget.clicked.connect(lambda rid=record.id: self.record_selected.emit(rid))
         widget.delete_clicked.connect(lambda rid=record.id: self._delete_record(rid, confirm=False))
         self.list_widget.insertItem(0, item)
@@ -160,7 +168,7 @@ class HistoryPanel(QWidget):
         item.setData(Qt.UserRole, record.id)
         item.setSizeHint(QSize(0, 36))
 
-        widget = HistoryItemWidget(record.list_text())
+        widget = HistoryItemWidget(record.list_text(), record.item_tooltip())
         widget.clicked.connect(lambda rid=record.id: self.record_selected.emit(rid))
         widget.delete_clicked.connect(lambda rid=record.id: self._delete_record(rid, confirm=False))
 
@@ -198,7 +206,7 @@ class HistoryPanel(QWidget):
         elif action == delete_same_action:
             self._delete_same_method_url_except(record_id, confirm=False)
         elif action == delete_all_action:
-            self._delete_all(confirm=False)
+            self._delete_all(confirm=True)
 
     def _rename_record(self, record_id: str) -> None:
         record = self.history_store.get(record_id)
@@ -209,8 +217,9 @@ class HistoryPanel(QWidget):
             'Rename',
             'Request name:',
             record.name or record.display_name(),
+            allow_empty=True,
         )
-        if not new_name:
+        if new_name is None:
             return
         updated = self.history_store.rename(record_id, new_name)
         if updated:

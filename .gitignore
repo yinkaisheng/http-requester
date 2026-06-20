@@ -94,6 +94,7 @@ $RECYCLE.BIN/
 logs/
 
 # Local app data
+config/
 history.json
 session.json
 data/

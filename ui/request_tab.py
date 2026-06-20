@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
+    QMessageBox,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -32,6 +33,7 @@ from models.http_models import (
     HttpResponse,
     decode_stored_response_body,
     encode_response_body_for_storage,
+    url_without_query,
 )
 from pyqt_async_task import AsyncTask, MsgIDThreadExit
 from services.curl_export import format_curl_linux_command
@@ -333,7 +335,7 @@ class RequestTab(QWidget):
             return self._record.name.strip()
         if self._draft_name.strip():
             return self._draft_name.strip()
-        url = self.url_edit.text().strip()
+        url = url_without_query(self.url_edit.text().strip())
         if url:
             return url
         return 'New Request'
@@ -496,10 +498,28 @@ class RequestTab(QWidget):
         self._clear_response_display()
 
     def _on_send_clicked(self) -> None:
+        req = self.collect_request()
+        if req.method.upper() == 'GET' and req.has_body():
+            reply = QMessageBox.question(
+                self,
+                'Confirm GET with body',
+                'Send a non-empty request body using GET?',
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.Cancel,
+            )
+            if reply == QMessageBox.Cancel:
+                return
+            if reply == QMessageBox.No:
+                post_index = self.method_combo.findText('POST')
+                if post_index >= 0:
+                    self.method_combo.setCurrentIndex(post_index)
+                req = self.collect_request()
+        self._execute_send(req)
+
+    def _execute_send(self, req: HttpRequest) -> None:
         self.send_btn.setEnabled(False)
         self._set_status_text('Sending...')
         self._set_status_style('statusPending')
-        req = self.collect_request()
         try:
             self.async_task.runTaskInThread(_http_worker, req, self._on_http_result)
         except Exception:
@@ -597,7 +617,9 @@ class RequestTab(QWidget):
         )
         if self._draft_name.strip():
             record.name = self._draft_name.strip()
-        if not resp.error or resp.status_code:
+        if resp.error and not resp.status_code:
+            record.error = resp.error
+        elif not resp.error or resp.status_code:
             snapshot = _response_snapshot(resp)
             record.status_code = snapshot['status_code']
             record.status_reason = snapshot['status_reason']
@@ -605,6 +627,8 @@ class RequestTab(QWidget):
             record.response_headers = snapshot['response_headers']
             record.response_body = snapshot['response_body']
             record.response_body_is_binary = snapshot['response_body_is_binary']
+            if resp.error:
+                record.error = resp.error
 
         self._record = record
         self.record_id = record.id

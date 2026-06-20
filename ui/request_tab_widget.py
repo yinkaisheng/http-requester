@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from PyQt5.QtCore import Qt, pyqtSignal, QEvent
-from PyQt5.QtGui import QMouseEvent
+from PyQt5.QtGui import QFontMetrics, QMouseEvent
 from PyQt5.QtWidgets import QMenu, QPushButton, QTabBar, QTabWidget, QWidget
 
 from models.http_models import HistoryRecord
@@ -15,6 +15,7 @@ from ui.dialogs import prompt_text
 from ui.request_tab import RequestTab
 
 TAB_CLOSE_BUTTON_TEXT = '\u00d7'
+TAB_TITLE_MAX_WIDTH = 500
 
 
 class RequestTabWidget(QTabWidget):
@@ -53,9 +54,23 @@ class RequestTabWidget(QTabWidget):
         return super().eventFilter(obj, event)
 
     def addTab(self, widget: QWidget, label: str) -> int:
+        if isinstance(widget, RequestTab):
+            label = self._format_tab_bar_title(widget.tab_title())
         index = super().addTab(widget, label)
         self._install_tab_close_button(index)
         return index
+
+    def _format_tab_bar_title(self, title: str) -> str:
+        metrics = QFontMetrics(self.font())
+        if metrics.horizontalAdvance(title) <= TAB_TITLE_MAX_WIDTH:
+            return title
+        return metrics.elidedText(title, Qt.ElideRight, TAB_TITLE_MAX_WIDTH)
+
+    def _update_tab_text(self, index: int, tab: RequestTab) -> None:
+        full_title = tab.tab_title()
+        display_title = self._format_tab_bar_title(full_title)
+        self.setTabText(index, display_title)
+        self.setTabToolTip(index, full_title if display_title != full_title else '')
 
     def _install_tab_close_button(self, index: int) -> None:
         btn = QPushButton(TAB_CLOSE_BUTTON_TEXT, self)
@@ -218,8 +233,9 @@ class RequestTabWidget(QTabWidget):
             'Rename',
             'Request name:',
             widget.tab_title(),
+            allow_empty=True,
         )
-        if not new_name:
+        if new_name is None:
             return
         record_id = widget.get_record_id()
         if record_id:
@@ -230,7 +246,7 @@ class RequestTabWidget(QTabWidget):
             self.record_renamed.emit(record_id, new_name)
         else:
             widget.set_draft_name(new_name)
-        self.setTabText(index, widget.tab_title())
+        self._update_tab_text(index, widget)
         self.tab_title_changed.emit()
         self.workspace_changed.emit()
 
@@ -244,7 +260,7 @@ class RequestTabWidget(QTabWidget):
         if not isinstance(widget, RequestTab):
             return
         widget.apply_record_name(new_name)
-        self.setTabText(index, widget.tab_title())
+        self._update_tab_text(index, widget)
         self.tab_title_changed.emit()
         self.workspace_changed.emit()
 
@@ -262,7 +278,7 @@ class RequestTabWidget(QTabWidget):
         for i in range(self.count()):
             widget = self.widget(i)
             if widget is sender_tab and isinstance(widget, RequestTab):
-                self.setTabText(i, widget.tab_title())
+                self._update_tab_text(i, widget)
                 break
         self._rebuild_map()
         self.tab_title_changed.emit()

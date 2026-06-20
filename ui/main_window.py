@@ -23,14 +23,12 @@ from pyqt_async_task import AsyncTask
 from storage.history_store import HistoryStore
 from models.http_models import HistoryRecord
 from storage.session_store import SessionStore
-from ui.dialogs import prompt_editor_settings
+from ui.dialogs import AppSettings, prompt_app_settings
 from ui.history_panel import HistoryPanel
 from ui.request_tab import splitter_ratio_to_sizes, splitter_sizes_to_ratio
 from ui.request_tab_widget import RequestTabWidget
 from ui.theme import (
     CURRENT_THEME_VERSION,
-    THEME_LABELS,
-    THEME_OPTIONS,
     apply_app_theme,
     default_body_text_font_family,
     default_body_text_font_size_px,
@@ -39,7 +37,6 @@ from ui.theme import (
     normalize_body_text_font_size,
     normalize_theme_name,
 )
-from ui.widgets import ArrowComboBox
 
 
 class MainWindow(QMainWindow):
@@ -61,6 +58,7 @@ class MainWindow(QMainWindow):
         self._main_splitter: Optional[QSplitter] = None
         self._body_text_font_size = default_body_text_font_size_px()
         self._body_text_font_family = default_body_text_font_family()
+        self._theme = normalize_theme_name(None)
         self._init_ui()
         self._connect_signals()
         self._restore_session()
@@ -78,14 +76,6 @@ class MainWindow(QMainWindow):
         self.new_btn.setObjectName('primaryButton')
         self.new_btn.clicked.connect(self._on_new_request)
         top_layout.addWidget(self.new_btn)
-
-        self.theme_combo = ArrowComboBox()
-        self.theme_combo.setObjectName('themeCombo')
-        self.theme_combo.setMinimumWidth(130)
-        for theme_name in THEME_OPTIONS:
-            self.theme_combo.addItem(THEME_LABELS[theme_name], theme_name)
-        self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
-        top_layout.addWidget(self.theme_combo)
 
         self.settings_btn = QToolButton()
         self.settings_btn.setObjectName('settingsButton')
@@ -145,10 +135,7 @@ class MainWindow(QMainWindow):
         theme = normalize_theme_name(
             migrate_session_theme(session.get('theme'), session.get('theme_version'))
         )
-        theme_index = THEME_OPTIONS.index(theme)
-        self.theme_combo.blockSignals(True)
-        self.theme_combo.setCurrentIndex(theme_index)
-        self.theme_combo.blockSignals(False)
+        self._theme = theme
         self._body_text_font_size = normalize_body_text_font_size(session.get('body_text_font_size'))
         self._body_text_font_family = normalize_body_text_font_family(session.get('body_text_font_family'))
         self._apply_appearance()
@@ -221,7 +208,7 @@ class MainWindow(QMainWindow):
         self.request_tabs.new_request()
 
     def _current_theme(self) -> str:
-        return normalize_theme_name(self.theme_combo.currentData())
+        return normalize_theme_name(self._theme)
 
     def _apply_appearance(self) -> None:
         app = QApplication.instance()
@@ -234,27 +221,21 @@ class MainWindow(QMainWindow):
             self._body_text_font_family,
         )
 
-    def _on_settings_clicked(self) -> None:
-        settings = prompt_editor_settings(
-            self,
-            self._body_text_font_size,
-            self._body_text_font_family,
-        )
-        if settings is None:
-            return
-        if (
-            settings.size == self._body_text_font_size
-            and settings.family == self._body_text_font_family
-        ):
-            return
+    def _save_settings(self, settings: AppSettings) -> None:
+        self._theme = settings.theme
         self._body_text_font_size = settings.size
         self._body_text_font_family = settings.family
         self._apply_appearance()
         self._save_session()
 
-    def _on_theme_changed(self, _index: int) -> None:
-        self._apply_appearance()
-        self._save_session()
+    def _on_settings_clicked(self) -> None:
+        prompt_app_settings(
+            self,
+            self._current_theme(),
+            self._body_text_font_size,
+            self._body_text_font_family,
+            on_save=self._save_settings,
+        )
 
     def _on_record_selected(self, record_id: str) -> None:
         record = self.history_panel.get_record(record_id)

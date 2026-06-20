@@ -110,7 +110,8 @@ Not every curl or pwsh option is supported (e.g. cookies, proxies, redirects). P
 
 ### UI
 
-- **Themes** — Solarized Light, Light, and Dark (selector in the top bar)
+- **Settings** — click **⚙** next to **+ New Request** for theme, editor font family/size; **Apply** saves without closing the dialog
+- **Themes** — Solarized Light, Light, and Dark
 - **Clean UI** — Fusion style with consistent tables, tabs, and context menus
 
 ## Usage
@@ -119,19 +120,20 @@ Not every curl or pwsh option is supported (e.g. cookies, proxies, redirects). P
 2. Enter the URL, method, headers, and body as needed.
 3. Click **Send** to execute the request; each send adds a history entry on the left.
 4. Click a history item to open it in a tab (or focus the tab if already open).
-5. Right-click a history item for rename / delete / bulk delete; right-click a tab bar for **Rename tab**.
+5. Right-click a history item for rename / delete / bulk delete (no confirmation for bulk delete); right-click a tab bar for **Rename tab**.
 6. Right-click the request headers table to copy, paste headers, or paste a curl / PowerShell command.
 7. Use **curl** / **pwsh** toolbar buttons to copy the current request as a command.
+8. Click **⚙ Settings** to change theme and editor font; **Apply** or **Save** persists changes, **Close** closes the dialog (already-applied settings stay in effect).
 
 ## Data files
 
-Local data is stored under `data/` next to the executable (or project root when running from source):
+Local data is stored under `config/` next to the executable (or project root when running from source):
 
 | Path | Purpose |
 |------|---------|
-| `data/history.json` | History list metadata (id, name, method, URL, status, time) |
-| `data/records/{id}.json` | Full request/response payload per history entry |
-| `data/session.json` | Theme, window size, splitter layout, and open tabs |
+| `config/history.json` | History list metadata (id, name, method, URL, status, time) |
+| `config/records/{id}.json` | Full request/response payload per history entry |
+| `config/session.json` | Theme, font settings, window size, splitter layout, and open tabs |
 
 These paths are listed in `.gitignore` and are not committed to version control.
 

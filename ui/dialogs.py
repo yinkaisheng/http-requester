@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
@@ -16,17 +16,22 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ui.widgets import ArrowFontComboBox, GlyphSpinBox
+from ui.widgets import ArrowFontComboBox, ArrowComboBox, GlyphSpinBox
 from ui.theme import (
     BODY_TEXT_FONT_SIZE_MAX,
     BODY_TEXT_FONT_SIZE_MIN,
+    THEME_LABELS,
+    THEME_OPTIONS,
+    ThemeName,
     default_body_text_font_family,
     normalize_body_text_font_family,
+    normalize_theme_name,
 )
 
 
 @dataclass(frozen=True)
-class EditorFontSettings:
+class AppSettings:
+    theme: ThemeName
     size: int
     family: str
 
@@ -46,6 +51,7 @@ def prompt_text(
     initial: str = '',
     *,
     min_width: int = 400,
+    allow_empty: bool = False,
 ) -> Optional[str]:
     dialog = _create_dialog(parent, title, min_width=min_width)
 
@@ -65,7 +71,9 @@ def prompt_text(
     if dialog.exec_() != QDialog.Accepted:
         return None
     text = edit.text().strip()
-    return text or None
+    if not text and not allow_empty:
+        return None
+    return text
 
 
 def _select_monospace_family(combo: QFontComboBox, family: str) -> None:
@@ -80,39 +88,87 @@ def _select_monospace_family(combo: QFontComboBox, family: str) -> None:
     combo.setCurrentFont(QFont(default_body_text_font_family()))
 
 
-def prompt_editor_settings(
+def prompt_app_settings(
     parent: QWidget,
+    current_theme: str,
     current_size: int,
     current_family: str,
     *,
+    on_save: Optional[Callable[[AppSettings], None]] = None,
     min_width: int = 400,
-) -> Optional[EditorFontSettings]:
+) -> Optional[AppSettings]:
     dialog = _create_dialog(parent, 'Settings', min_width=min_width)
+    initial = AppSettings(
+        theme=normalize_theme_name(current_theme),
+        size=current_size,
+        family=normalize_body_text_font_family(current_family),
+    )
+    last_saved = initial
 
     layout = QFormLayout(dialog)
+    theme_combo = ArrowComboBox()
+    theme_combo.setMinimumWidth(min_width - 48)
+    for theme_name in THEME_OPTIONS:
+        theme_combo.addItem(THEME_LABELS[theme_name], theme_name)
+    theme_combo.setCurrentIndex(THEME_OPTIONS.index(initial.theme))
+    layout.addRow('Theme', theme_combo)
+
     family_combo = ArrowFontComboBox()
     family_combo.setEditable(False)
     family_combo.setFontFilters(QFontComboBox.MonospacedFonts)
     family_combo.setMinimumWidth(min_width - 48)
-    _select_monospace_family(family_combo, current_family)
+    _select_monospace_family(family_combo, initial.family)
     layout.addRow('Editor Font Family', family_combo)
 
     spin = GlyphSpinBox()
     spin.setRange(BODY_TEXT_FONT_SIZE_MIN, BODY_TEXT_FONT_SIZE_MAX)
-    spin.setValue(current_size)
+    spin.setValue(initial.size)
     spin.setMinimumWidth(120)
     layout.addRow('Editor Font Size (px)', spin)
 
-    buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=dialog)
+    def current_settings() -> AppSettings:
+        return AppSettings(
+            theme=normalize_theme_name(theme_combo.currentData()),
+            size=spin.value(),
+            family=normalize_body_text_font_family(family_combo.currentFont().family()),
+        )
+
+    buttons = QDialogButtonBox(
+        QDialogButtonBox.Apply | QDialogButtonBox.Save | QDialogButtonBox.Close,
+        parent=dialog,
+    )
+    apply_btn = buttons.button(QDialogButtonBox.Apply)
+
+    def update_apply_enabled() -> None:
+        if apply_btn is not None:
+            apply_btn.setEnabled(current_settings() != last_saved)
+
+    def commit_settings(settings: AppSettings) -> None:
+        nonlocal last_saved
+        if settings == last_saved:
+            return
+        if on_save is not None:
+            on_save(settings)
+        last_saved = settings
+        update_apply_enabled()
+
+    def do_apply() -> None:
+        commit_settings(current_settings())
+
+    if apply_btn is not None:
+        apply_btn.clicked.connect(do_apply)
+        apply_btn.setEnabled(False)
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
     layout.addRow(buttons)
 
-    family_combo.setFocus()
+    theme_combo.currentIndexChanged.connect(lambda _i: update_apply_enabled())
+    family_combo.currentFontChanged.connect(lambda _f: update_apply_enabled())
+    spin.valueChanged.connect(lambda _v: update_apply_enabled())
+
+    theme_combo.setFocus()
 
     if dialog.exec_() != QDialog.Accepted:
         return None
-    return EditorFontSettings(
-        size=spin.value(),
-        family=normalize_body_text_font_family(family_combo.currentFont().family()),
-    )
+    commit_settings(current_settings())
+    return last_saved

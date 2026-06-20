@@ -122,7 +122,7 @@ def parse_powershell_command(text: str) -> Optional[HttpRequest]:
         except ValueError:
             pass
 
-    ssl_verify = re.search(r'-SkipCertificateCheck', command, re.I) is None
+    ssl_verify = False
 
     headers: List[HeaderItem] = []
     headers_block = _extract_hashtable_block(command, 'Headers')

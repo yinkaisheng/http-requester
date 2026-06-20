@@ -62,7 +62,7 @@ def parse_curl_command(text: str) -> Optional[HttpRequest]:
     body_text = ''
     body_type = BodyType.NONE
     form_fields: List[FormField] = []
-    ssl_verify = True
+    ssl_verify = False
     timeout_seconds = DEFAULT_REQUEST_TIMEOUT_SECONDS
 
     index = 0
