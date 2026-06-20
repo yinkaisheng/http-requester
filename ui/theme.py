@@ -88,7 +88,7 @@ SOLARIZED_LIGHT_PALETTE = ThemePalette(
 )
 
 WHITE_LIGHT_PALETTE = ThemePalette(
-    window_bg='#fafafa',
+    window_bg='#f5f5f5',
     window_fg='#333333',
     surface='#f0f0f0',
     surface_alt='#f5f5f5',
@@ -212,7 +212,13 @@ def apply_app_theme(
 ) -> None:
     palette = THEME_PALETTES[normalize_theme_name(theme)]
     app.setStyleSheet(
-        _build_stylesheet(app.font(), palette, body_text_font_size, body_text_font_family)
+        _build_stylesheet(
+            app.font(),
+            palette,
+            body_text_font_size,
+            body_text_font_family,
+            normalize_theme_name(theme),
+        )
     )
 
 
@@ -243,6 +249,7 @@ def _build_stylesheet(
     palette: ThemePalette,
     body_text_font_size: int | None = None,
     body_text_font_family: str | None = None,
+    theme: ThemeName = THEME_SOLARIZED,
 ) -> str:
     size_px = resolve_ui_font_size_px(font)
     if body_text_font_size is None:
@@ -252,6 +259,13 @@ def _build_stylesheet(
     body_text_font_family = body_text_font_family_css(body_text_font_family)
     ui_font_family = font.family().replace('"', '\\"')
     p = palette
+    if theme == THEME_LIGHT:
+        tab_inactive_bg = '#dfdfdf'
+        tab_inactive_hover_bg = '#eaeaea'
+    else:
+        tab_inactive_bg = p.hover_bg
+        tab_inactive_hover_bg = p.surface
+    tab_selected_bg = p.window_bg
     return f'''
 * {{
     font-size: {size_px}px;
@@ -322,8 +336,8 @@ QTabWidget::pane {{
 }}
 
 QTabBar::tab {{
-    background-color: {p.surface};
-    color: {p.text_muted};
+    background-color: {tab_inactive_bg};
+    color: {p.text_subtle};
     border: 1px solid {p.border};
     border-bottom: none;
     border-top-left-radius: 4px;
@@ -334,13 +348,15 @@ QTabBar::tab {{
 }}
 
 QTabBar::tab:selected {{
-    background-color: {p.window_bg};
+    background-color: {tab_selected_bg};
     color: {p.window_fg};
-    border-bottom: 1px solid {p.window_bg};
+    border: 1px solid {p.border_strong};
+    border-bottom: 1px solid {tab_selected_bg};
 }}
 
 QTabBar::tab:hover:!selected {{
-    background-color: {p.hover_bg_soft};
+    background-color: {tab_inactive_hover_bg};
+    color: {p.text_muted};
 }}
 
 QTabBar::close-button {{

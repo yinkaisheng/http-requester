@@ -192,13 +192,13 @@ class HistoryPanel(QWidget):
         if action == rename_action:
             self._rename_record(record_id)
         elif action == delete_action:
-            self._delete_record(record_id, confirm=True)
+            self._delete_record(record_id, confirm=False)
         elif action == delete_others_action:
-            self._delete_others_except(record_id)
+            self._delete_others_except(record_id, confirm=False)
         elif action == delete_same_action:
-            self._delete_same_method_url_except(record_id)
+            self._delete_same_method_url_except(record_id, confirm=False)
         elif action == delete_all_action:
-            self._delete_all()
+            self._delete_all(confirm=False)
 
     def _rename_record(self, record_id: str) -> None:
         record = self.history_store.get(record_id)
@@ -250,27 +250,27 @@ class HistoryPanel(QWidget):
             'Are you sure you want to delete this history record?',
         )
 
-    def _delete_others_except(self, record_id: str) -> None:
+    def _delete_others_except(self, record_id: str, confirm: bool = False) -> None:
         ids = self.history_store.ids_except(record_id)
         self._delete_records(
             ids,
-            True,
+            confirm,
             f'Delete all other history records ({len(ids)} item(s))?',
         )
 
-    def _delete_same_method_url_except(self, record_id: str) -> None:
+    def _delete_same_method_url_except(self, record_id: str, confirm: bool = False) -> None:
         ids = self.history_store.ids_same_method_url_except(record_id)
         self._delete_records(
             ids,
-            True,
+            confirm,
             f'Delete other records with the same method and URL ({len(ids)} item(s))?',
         )
 
-    def _delete_all(self) -> None:
+    def _delete_all(self, confirm: bool = False) -> None:
         ids = self.history_store.all_ids()
         self._delete_records(
             ids,
-            True,
+            confirm,
             f'Delete all history records ({len(ids)} item(s))?',
         )
 

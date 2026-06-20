@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QEvent
+from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtWidgets import QMenu, QPushButton, QTabBar, QTabWidget, QWidget
 
 from models.http_models import HistoryRecord
@@ -39,6 +40,17 @@ class RequestTabWidget(QTabWidget):
         self.tabBar().tabMoved.connect(self._rebuild_map)
         self.tabBar().tabMoved.connect(self.workspace_changed.emit)
         self.tabBarDoubleClicked.connect(self._on_tab_bar_double_clicked)
+        self.tabBar().installEventFilter(self)
+
+    def eventFilter(self, obj, event) -> bool:
+        if obj is self.tabBar() and event.type() == QEvent.MouseButtonRelease:
+            mouse_event = event
+            if isinstance(mouse_event, QMouseEvent) and mouse_event.button() == Qt.MiddleButton:
+                index = self.tabBar().tabAt(mouse_event.pos())
+                if index >= 0:
+                    self._close_tab_at_index(index)
+                    return True
+        return super().eventFilter(obj, event)
 
     def addTab(self, widget: QWidget, label: str) -> int:
         index = super().addTab(widget, label)
@@ -137,6 +149,11 @@ class RequestTabWidget(QTabWidget):
             self.removeTab(0)
         self._record_tab_map.clear()
 
+    def close_current_tab(self) -> None:
+        index = self.currentIndex()
+        if index >= 0:
+            self._close_tab_at_index(index)
+
     def close_record_tab(self, record_id: str) -> None:
         if record_id in self._record_tab_map:
             index = self._record_tab_map[record_id]
@@ -187,7 +204,7 @@ class RequestTabWidget(QTabWidget):
             return
 
         menu = QMenu(self)
-        rename_action = menu.addAction('Rename tab')
+        rename_action = menu.addAction('Rename')
         action = menu.exec_(self.tabBar().mapToGlobal(pos))
         if action == rename_action:
             self._rename_tab_at_index(index)
@@ -198,8 +215,8 @@ class RequestTabWidget(QTabWidget):
             return
         new_name = prompt_text(
             self,
-            'Rename tab',
-            'Tab name:',
+            'Rename',
+            'Request name:',
             widget.tab_title(),
         )
         if not new_name:

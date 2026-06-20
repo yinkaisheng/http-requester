@@ -2,15 +2,17 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import sys
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QCloseEvent
+from PyQt5.QtGui import QCloseEvent, QKeySequence
 from PyQt5.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QMainWindow,
     QPushButton,
+    QShortcut,
     QSplitter,
     QToolButton,
     QVBoxLayout,
@@ -110,6 +112,12 @@ class MainWindow(QMainWindow):
         self._main_splitter.setSizes([280, 920])
 
         main_layout.addWidget(self._main_splitter)
+        self._setup_tab_close_shortcut()
+
+    def _setup_tab_close_shortcut(self) -> None:
+        key = 'Ctrl+F4' if sys.platform == 'win32' else 'Ctrl+W'
+        shortcut = QShortcut(QKeySequence(key), self)
+        shortcut.activated.connect(self.request_tabs.close_current_tab)
 
     def _connect_signals(self) -> None:
         self.history_panel.record_selected.connect(self._on_record_selected)
