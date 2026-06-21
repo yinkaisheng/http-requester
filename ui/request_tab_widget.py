@@ -206,6 +206,20 @@ class RequestTabWidget(QTabWidget):
         self._ensure_at_least_one_tab()
         self.workspace_changed.emit()
 
+    def _close_other_tabs_at_index(self, keep_index: int) -> None:
+        if keep_index < 0 or keep_index >= self.count() or self.count() <= 1:
+            return
+        keep_widget = self.widget(keep_index)
+        if not isinstance(keep_widget, RequestTab):
+            return
+        indices_to_close = [i for i in range(self.count()) if i != keep_index]
+        for index in sorted(indices_to_close, reverse=True):
+            self._close_tab_at_index(index)
+        for i in range(self.count()):
+            if self.widget(i) is keep_widget:
+                self.setCurrentIndex(i)
+                break
+
     def _on_tab_bar_double_clicked(self, index: int) -> None:
         if index >= 0:
             self._close_tab_at_index(index)
@@ -220,9 +234,15 @@ class RequestTabWidget(QTabWidget):
 
         menu = QMenu(self)
         rename_action = menu.addAction('Rename')
+        close_others_action = None
+        if self.count() > 1:
+            menu.addSeparator()
+            close_others_action = menu.addAction('Close Other Tabs')
         action = menu.exec_(self.tabBar().mapToGlobal(pos))
         if action == rename_action:
             self._rename_tab_at_index(index)
+        elif close_others_action is not None and action == close_others_action:
+            self._close_other_tabs_at_index(index)
 
     def _rename_tab_at_index(self, index: int) -> None:
         widget = self.widget(index)
