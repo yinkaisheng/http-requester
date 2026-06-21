@@ -41,7 +41,7 @@ def main():
     logger.info(f'========================================\n\n')
     logger.info(f'executable={exe_path}, pid={os.getpid()}, working_directory={os.getcwd()}')
     logger.info(f'__file__={script_path}, argv={sys.argv}')
-    logger.info(f'sys.path=\n[\n{"\n".join(sys.path)}\n]')
+    logger.info('sys.path=\n[\n{}\n]'.format('\n'.join(sys.path)))
     app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create('Fusion'))
     app.setApplicationName('HTTP Requester')

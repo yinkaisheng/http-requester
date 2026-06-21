@@ -23,9 +23,37 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## Portable release (Windows)
+## Portable release
 
-Each release includes a portable **~18 MB** 7z archive for **Windows 7** and later. The package bundles a self-contained **Python 3.11** runtime and all required libraries, so you can extract it and run `HttpRequester.exe` without installing Python or running `pip` on your system. The executable is a native launcher ([PythonCaller](https://github.com/yinkaisheng/PythonCaller)) that loads the embedded runtime and starts the Python entry point.
+Portable builds bundle a self-contained Python runtime and dependencies, so you can extract the archive and run the app without installing Python or running `pip` on your system. Both use a small native launcher that reads a config file next to the executable and starts the embedded Python entry point.
+
+### Windows
+
+Each release includes a portable **`HttpRequester-{version}-Win7-amd64.7z` ~18 MB** 7z archive for **Windows 7** and later with **Python 3.11**. Extract and run `HttpRequester.exe`. The launcher source is [PythonCaller](https://github.com/yinkaisheng/PythonCaller) (Windows).
+
+```
+HttpRequester/
+├── HttpRequester.exe
+├── HttpRequester.exe.conf   → RuntimeX64 + Lib\http-requester\main.pyc
+├── RuntimeX64/              # Embedded Python 3.11 runtime
+├── config/
+└── logs/
+```
+
+### Linux
+
+Each release includes a portable **`httpreq-{version}-linux-amd64.tar.gz`** archive for **x86_64 Linux**. Extract it to get an `httpreq/` directory with a self-contained **Python 3.12** runtime, then run `./httpreq` from that directory (or add it to your `PATH`). The launcher source is [PythonCaller/Linux](https://github.com/yinkaisheng/PythonCaller/tree/master/Linux).
+
+```
+httpreq/
+├── httpreq                    # Native launcher
+├── httpreq.conf               → lib + python3.12/httpreq/main.pyc
+├── lib/                       # Embedded Python 3.12 runtime
+├── config/
+└── logs/
+```
+
+Command-line arguments passed to the launcher are forwarded to the Python entry script.
 
 ## Features
 
