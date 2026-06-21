@@ -25,7 +25,7 @@ python main.py
 
 ## Portable release (Windows)
 
-Each release includes a portable **~18 MB** 7z archive for **Windows 7** and later. The package bundles a self-contained **Python 3.11** runtime and all required libraries, so you can extract it and run `HttpRequester.exe` without installing Python or running `pip` on your system.
+Each release includes a portable **~18 MB** 7z archive for **Windows 7** and later. The package bundles a self-contained **Python 3.11** runtime and all required libraries, so you can extract it and run `HttpRequester.exe` without installing Python or running `pip` on your system. The executable is a native launcher ([PythonCaller](https://github.com/yinkaisheng/PythonCaller)) that loads the embedded runtime and starts the Python entry point.
 
 ## Features
 
