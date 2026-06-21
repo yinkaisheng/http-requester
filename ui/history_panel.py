@@ -153,6 +153,20 @@ class HistoryPanel(QWidget):
         self.list_widget.insertItem(0, item)
         self.list_widget.setItemWidget(item, widget)
         self._item_widgets[record.id] = widget
+        self.select_record(record.id)
+
+    def select_record(self, record_id: Optional[str]) -> None:
+        if not record_id:
+            self.list_widget.clearSelection()
+            self.list_widget.setCurrentRow(-1)
+            return
+        for index in range(self.list_widget.count()):
+            item = self.list_widget.item(index)
+            if item.data(Qt.UserRole) == record_id:
+                self.list_widget.setCurrentRow(index)
+                return
+        self.list_widget.clearSelection()
+        self.list_widget.setCurrentRow(-1)
 
     def update_record_name(self, record_id: str, new_name: str) -> None:
         for record in self._records:

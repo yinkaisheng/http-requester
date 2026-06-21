@@ -25,7 +25,7 @@ from models.http_models import HistoryRecord
 from storage.session_store import SessionStore
 from ui.dialogs import AppSettings, prompt_app_settings, show_about_dialog
 from ui.history_panel import HistoryPanel
-from ui.request_tab import splitter_ratio_to_sizes, splitter_sizes_to_ratio
+from ui.request_tab import RequestTab, splitter_ratio_to_sizes, splitter_sizes_to_ratio
 from ui.request_tab_widget import RequestTabWidget
 from ui.theme import (
     CURRENT_THEME_VERSION,
@@ -123,13 +123,19 @@ class MainWindow(QMainWindow):
         self.history_panel.record_renamed.connect(self._on_record_renamed)
         self.request_tabs.record_renamed.connect(self._on_record_renamed)
         self.request_tabs.record_saved.connect(self._on_record_saved)
-        self.request_tabs.currentChanged.connect(self._schedule_session_save)
+        self.request_tabs.currentChanged.connect(self._on_current_tab_changed)
         self.request_tabs.tab_title_changed.connect(self._schedule_session_save)
         self.request_tabs.workspace_changed.connect(self._schedule_session_save)
         self.request_tabs.record_saved.connect(self._schedule_session_save)
 
     def _schedule_session_save(self, *_args) -> None:
         self._session_save_timer.start()
+
+    def _on_current_tab_changed(self, index: int) -> None:
+        self._schedule_session_save()
+        widget = self.request_tabs.widget(index) if index >= 0 else None
+        record_id = widget.get_record_id() if isinstance(widget, RequestTab) else None
+        self.history_panel.select_record(record_id)
 
     def _on_record_renamed(self, record_id: str, new_name: str) -> None:
         self.history_panel.update_record_name(record_id, new_name)
@@ -166,6 +172,7 @@ class MainWindow(QMainWindow):
             self.request_tabs.restore_session(tabs, current_index)
         elif self.request_tabs.count() == 0:
             self.request_tabs.new_request()
+        self._on_current_tab_changed(self.request_tabs.currentIndex())
 
     def _center_on_screen(self) -> None:
         screen = QApplication.primaryScreen()
