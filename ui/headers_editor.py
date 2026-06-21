@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import base64
 from typing import Callable, Dict, List, Optional, Tuple
 
 from PyQt5.QtCore import QPointF, QPoint, Qt, QEvent, QObject
@@ -28,6 +29,7 @@ from PyQt5.QtWidgets import (
 from models.http_models import HeaderItem, HttpRequest, is_valid_header_name
 from services.curl_import import parse_curl_command
 from services.powershell_import import parse_powershell_command
+from ui.dialogs import prompt_basic_auth, prompt_bearer_token
 from ui.widgets import CHECK_MARK_COLOR
 
 TABLE_HEADER_HEIGHT = 22
@@ -48,6 +50,8 @@ PASTE_HEADERS_MENU_TEXT = 'Paste Headers (Ctrl+V)'
 PASTE_CURL_MENU_TEXT = 'Paste from Curl Command'
 PASTE_POWERSHELL_MENU_TEXT = 'Paste from PowerShell Command'
 DELETE_SELECTED_HEADERS_MENU_TEXT = 'Delete Selected Headers'
+BASIC_AUTH_MENU_TEXT = 'Basic Auth...'
+BEARER_TOKEN_MENU_TEXT = 'Bearer Token...'
 
 
 def _compact_action_button(text: str) -> QPushButton:
@@ -174,6 +178,8 @@ class HeaderTableInteraction(QObject):
         curl_callback: Optional[Callable[[], None]] = None,
         powershell_callback: Optional[Callable[[], None]] = None,
         delete_rows_callback: Optional[Callable[[List[int]], None]] = None,
+        basic_auth_callback: Optional[Callable[[], None]] = None,
+        bearer_auth_callback: Optional[Callable[[], None]] = None,
     ):
         super().__init__(table)
         self._table = table
@@ -185,6 +191,8 @@ class HeaderTableInteraction(QObject):
         self._curl_callback = curl_callback
         self._powershell_callback = powershell_callback
         self._delete_rows_callback = delete_rows_callback
+        self._basic_auth_callback = basic_auth_callback
+        self._bearer_auth_callback = bearer_auth_callback
 
         table.setContextMenuPolicy(Qt.CustomContextMenu)
         table.customContextMenuRequested.connect(self._on_context_menu)
@@ -323,6 +331,14 @@ class HeaderTableInteraction(QObject):
         if self._delete_rows_callback is not None:
             delete_action = menu.addAction(DELETE_SELECTED_HEADERS_MENU_TEXT)
             delete_action.setEnabled(bool(selected_rows))
+        basic_auth_action = None
+        bearer_auth_action = None
+        if self._basic_auth_callback is not None or self._bearer_auth_callback is not None:
+            menu.addSeparator()
+        if self._basic_auth_callback is not None:
+            basic_auth_action = menu.addAction(BASIC_AUTH_MENU_TEXT)
+        if self._bearer_auth_callback is not None:
+            bearer_auth_action = menu.addAction(BEARER_TOKEN_MENU_TEXT)
         paste_action = None
         paste_curl_action = None
         paste_powershell_action = None
@@ -351,6 +367,10 @@ class HeaderTableInteraction(QObject):
         elif delete_action is not None and action == delete_action:
             if selected_rows:
                 self._delete_rows_callback(selected_rows)
+        elif basic_auth_action is not None and action == basic_auth_action:
+            self._basic_auth_callback()
+        elif bearer_auth_action is not None and action == bearer_auth_action:
+            self._bearer_auth_callback()
         elif action == copy_all_action:
             text = format_headers_text(_read_table_rows(table, self._key_col, self._value_col))
             if text:
@@ -384,6 +404,8 @@ def attach_header_table_menu(
     curl_callback: Optional[Callable[[], None]] = None,
     powershell_callback: Optional[Callable[[], None]] = None,
     delete_rows_callback: Optional[Callable[[List[int]], None]] = None,
+    basic_auth_callback: Optional[Callable[[], None]] = None,
+    bearer_auth_callback: Optional[Callable[[], None]] = None,
 ) -> HeaderTableInteraction:
     interaction = HeaderTableInteraction(
         table,
@@ -394,6 +416,8 @@ def attach_header_table_menu(
         curl_callback=curl_callback,
         powershell_callback=powershell_callback,
         delete_rows_callback=delete_rows_callback,
+        basic_auth_callback=basic_auth_callback,
+        bearer_auth_callback=bearer_auth_callback,
     )
     table._header_table_interaction = interaction
     return interaction
@@ -516,6 +540,8 @@ class RawHeadersEditor(QWidget):
             curl_callback=self._curl_copy_callback,
             powershell_callback=self._powershell_copy_callback,
             delete_rows_callback=self._delete_rows,
+            basic_auth_callback=self._apply_basic_auth,
+            bearer_auth_callback=self._apply_bearer_auth,
         )
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 2, 0, 0)
@@ -588,6 +614,20 @@ class RawHeadersEditor(QWidget):
                     if toggle:
                         toggle.setChecked(True)
                     key_to_row[lower_key] = empty_row
+
+    def _apply_basic_auth(self) -> None:
+        creds = prompt_basic_auth(self)
+        if creds is None:
+            return
+        username, password = creds
+        encoded = base64.b64encode(f'{username}:{password}'.encode()).decode('ascii')
+        self._paste_headers([('Authorization', f'Basic {encoded}')])
+
+    def _apply_bearer_auth(self) -> None:
+        token = prompt_bearer_token(self)
+        if token is None:
+            return
+        self._paste_headers([('Authorization', f'Bearer {token}')])
 
     def _delete_rows(self, rows: List[int]) -> None:
         for row in sorted(rows, reverse=True):

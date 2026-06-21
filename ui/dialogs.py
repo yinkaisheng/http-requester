@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFontComboBox,
-    QFormLayout,
+    QGridLayout,
     QLineEdit,
     QLabel,
     QVBoxLayout,
@@ -48,6 +48,20 @@ def _create_dialog(parent: QWidget, title: str, *, min_width: int = 400) -> QDia
     return dialog
 
 
+def _create_form_grid() -> QGridLayout:
+    grid = QGridLayout()
+    grid.setColumnStretch(1, 1)
+    grid.setHorizontalSpacing(12)
+    grid.setVerticalSpacing(10)
+    return grid
+
+
+def _add_form_field(grid: QGridLayout, row: int, label_text: str, field: QWidget) -> None:
+    label = QLabel(label_text)
+    grid.addWidget(label, row, 0, Qt.AlignRight | Qt.AlignVCenter)
+    grid.addWidget(field, row, 1)
+
+
 def prompt_text(
     parent: QWidget,
     title: str,
@@ -59,15 +73,17 @@ def prompt_text(
 ) -> Optional[str]:
     dialog = _create_dialog(parent, title, min_width=min_width)
 
-    layout = QFormLayout(dialog)
+    layout = QVBoxLayout(dialog)
+    grid = _create_form_grid()
     edit = QLineEdit(initial)
     edit.setMinimumWidth(min_width - 48)
-    layout.addRow(label, edit)
+    _add_form_field(grid, 0, label, edit)
 
     buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=dialog)
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
-    layout.addRow(buttons)
+    layout.addLayout(grid)
+    layout.addWidget(buttons)
 
     edit.selectAll()
     edit.setFocus()
@@ -78,6 +94,65 @@ def prompt_text(
     if not text and not allow_empty:
         return None
     return text
+
+
+def prompt_basic_auth(
+    parent: QWidget,
+    *,
+    min_width: int = 400,
+) -> Optional[Tuple[str, str]]:
+    dialog = _create_dialog(parent, 'Basic Auth', min_width=min_width)
+
+    layout = QVBoxLayout(dialog)
+    grid = _create_form_grid()
+    username_edit = QLineEdit()
+    username_edit.setMinimumWidth(min_width - 48)
+    password_edit = QLineEdit()
+    password_edit.setEchoMode(QLineEdit.Password)
+    password_edit.setMinimumWidth(min_width - 48)
+    _add_form_field(grid, 0, 'Username', username_edit)
+    _add_form_field(grid, 1, 'Password', password_edit)
+
+    buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=dialog)
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+    layout.addLayout(grid)
+    layout.addWidget(buttons)
+
+    username_edit.setFocus()
+
+    if dialog.exec_() != QDialog.Accepted:
+        return None
+    return username_edit.text(), password_edit.text()
+
+
+def prompt_bearer_token(
+    parent: QWidget,
+    *,
+    min_width: int = 400,
+) -> Optional[str]:
+    dialog = _create_dialog(parent, 'Bearer Token', min_width=min_width)
+
+    layout = QVBoxLayout(dialog)
+    grid = _create_form_grid()
+    token_edit = QLineEdit()
+    token_edit.setMinimumWidth(min_width - 48)
+    _add_form_field(grid, 0, 'Token', token_edit)
+
+    buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=dialog)
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+    layout.addLayout(grid)
+    layout.addWidget(buttons)
+
+    token_edit.setFocus()
+
+    if dialog.exec_() != QDialog.Accepted:
+        return None
+    token = token_edit.text().strip()
+    if not token:
+        return None
+    return token
 
 
 def _select_monospace_family(combo: QFontComboBox, family: str) -> None:
@@ -109,26 +184,27 @@ def prompt_app_settings(
     )
     last_saved = initial
 
-    layout = QFormLayout(dialog)
+    layout = QVBoxLayout(dialog)
+    grid = _create_form_grid()
     theme_combo = ArrowComboBox()
     theme_combo.setMinimumWidth(min_width - 48)
     for theme_name in THEME_OPTIONS:
         theme_combo.addItem(THEME_LABELS[theme_name], theme_name)
     theme_combo.setCurrentIndex(THEME_OPTIONS.index(initial.theme))
-    layout.addRow('Theme', theme_combo)
+    _add_form_field(grid, 0, 'Theme', theme_combo)
 
     family_combo = ArrowFontComboBox()
     family_combo.setEditable(False)
     family_combo.setFontFilters(QFontComboBox.MonospacedFonts)
     family_combo.setMinimumWidth(min_width - 48)
     _select_monospace_family(family_combo, initial.family)
-    layout.addRow('Editor Font Family', family_combo)
+    _add_form_field(grid, 1, 'Editor Font Family', family_combo)
 
     spin = GlyphSpinBox()
     spin.setRange(BODY_TEXT_FONT_SIZE_MIN, BODY_TEXT_FONT_SIZE_MAX)
     spin.setValue(initial.size)
     spin.setMinimumWidth(120)
-    layout.addRow('Editor Font Size (px)', spin)
+    _add_form_field(grid, 2, 'Editor Font Size (px)', spin)
 
     def current_settings() -> AppSettings:
         return AppSettings(
@@ -164,7 +240,8 @@ def prompt_app_settings(
         apply_btn.setEnabled(False)
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
-    layout.addRow(buttons)
+    layout.addLayout(grid)
+    layout.addWidget(buttons)
 
     theme_combo.currentIndexChanged.connect(lambda _i: update_apply_enabled())
     family_combo.currentFontChanged.connect(lambda _f: update_apply_enabled())
