@@ -11,8 +11,8 @@ from log_util import config_logger, logger
 
 exe_path = Path(sys.executable).resolve()
 script_path = Path(__file__).resolve()
-if sys.platform == 'win32' and 'python' not in exe_path.name.lower():
-    os.chdir(exe_path.parent) # sys.executable is HttpRequester.exe
+if 'python' not in exe_path.name.lower():
+    os.chdir(exe_path.parent) # sys.executable is HttpRequester.exe(Windows) or httpreq(Linux)
     config_logger(logger, log_dir='logs', log_file='http-requester.log')
 else:
     os.chdir(script_path.parent)
@@ -39,8 +39,9 @@ def _load_app_icon() -> QIcon:
 
 def main():
     logger.info(f'========================================\n\n')
-    logger.info(f'executable={exe_path}, working_directory={os.getcwd()}')
+    logger.info(f'executable={exe_path}, pid={os.getpid()}, working_directory={os.getcwd()}')
     logger.info(f'__file__={script_path}, argv={sys.argv}')
+    logger.info(f'sys.path=\n[\n{"\n".join(sys.path)}\n]')
     app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create('Fusion'))
     app.setApplicationName('HTTP Requester')
