@@ -470,7 +470,7 @@ QPushButton#primaryButton:pressed {{
     background-color: {p.accent_pressed};
 }}
 
-QToolButton#settingsButton {{
+QToolButton#settingsButton, QToolButton#aboutButton {{
     background-color: {p.surface};
     border: 1px solid {p.border};
     border-radius: 3px;
@@ -483,12 +483,12 @@ QToolButton#settingsButton {{
     font-size: {max(size_px + 2, 14)}px;
 }}
 
-QToolButton#settingsButton:hover {{
+QToolButton#settingsButton:hover, QToolButton#aboutButton:hover {{
     background-color: {p.hover_bg};
     border-color: {p.border_strong};
 }}
 
-QToolButton#settingsButton:pressed {{
+QToolButton#settingsButton:pressed, QToolButton#aboutButton:pressed {{
     background-color: {p.surface_alt};
 }}
 

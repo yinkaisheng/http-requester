@@ -23,7 +23,7 @@ from pyqt_async_task import AsyncTask
 from storage.history_store import HistoryStore
 from models.http_models import HistoryRecord
 from storage.session_store import SessionStore
-from ui.dialogs import AppSettings, prompt_app_settings
+from ui.dialogs import AppSettings, prompt_app_settings, show_about_dialog
 from ui.history_panel import HistoryPanel
 from ui.request_tab import splitter_ratio_to_sizes, splitter_sizes_to_ratio
 from ui.request_tab_widget import RequestTabWidget
@@ -83,6 +83,13 @@ class MainWindow(QMainWindow):
         self.settings_btn.setToolTip('Settings')
         self.settings_btn.clicked.connect(self._on_settings_clicked)
         top_layout.addWidget(self.settings_btn)
+
+        self.about_btn = QToolButton()
+        self.about_btn.setObjectName('aboutButton')
+        self.about_btn.setText('\u24D8')
+        self.about_btn.setToolTip('About')
+        self.about_btn.clicked.connect(self._on_about_clicked)
+        top_layout.addWidget(self.about_btn)
         top_layout.addStretch()
 
         self._main_splitter = QSplitter(Qt.Horizontal)
@@ -236,6 +243,9 @@ class MainWindow(QMainWindow):
             self._body_text_font_family,
             on_save=self._save_settings,
         )
+
+    def _on_about_clicked(self) -> None:
+        show_about_dialog(self)
 
     def _on_record_selected(self, record_id: str) -> None:
         record = self.history_panel.get_record(record_id)

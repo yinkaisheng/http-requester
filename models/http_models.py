@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 import base64
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -72,6 +73,14 @@ def decode_stored_response_body(body: str, is_binary: bool) -> str:
     except Exception:
         return body
     return f'[Binary data, {len(data)} bytes]'
+
+
+_HEADER_NAME_PATTERN = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
+
+
+def is_valid_header_name(name: str) -> bool:
+    """Return True if name is a valid HTTP field-name token (RFC 9110)."""
+    return bool(name) and _HEADER_NAME_PATTERN.fullmatch(name) is not None
 
 
 @dataclass

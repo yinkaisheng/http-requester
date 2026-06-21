@@ -13,8 +13,12 @@ from PyQt5.QtWidgets import (
     QFontComboBox,
     QFormLayout,
     QLineEdit,
+    QLabel,
+    QVBoxLayout,
     QWidget,
 )
+
+from app_info import APP_NAME, APP_VERSION, GITHUB_URL
 
 from ui.widgets import ArrowFontComboBox, ArrowComboBox, GlyphSpinBox
 from ui.theme import (
@@ -172,3 +176,30 @@ def prompt_app_settings(
         return None
     commit_settings(current_settings())
     return last_saved
+
+
+def show_about_dialog(parent: QWidget) -> None:
+    dialog = _create_dialog(parent, 'About', min_width=360)
+
+    layout = QVBoxLayout(dialog)
+    layout.setSpacing(8)
+
+    title = QLabel(APP_NAME)
+    title.setAlignment(Qt.AlignCenter)
+    layout.addWidget(title)
+
+    version = QLabel(f'Version {APP_VERSION}')
+    version.setAlignment(Qt.AlignCenter)
+    layout.addWidget(version)
+
+    link = QLabel(f'<a href="{GITHUB_URL}">{GITHUB_URL}</a>')
+    link.setAlignment(Qt.AlignCenter)
+    link.setOpenExternalLinks(True)
+    link.setTextInteractionFlags(Qt.TextBrowserInteraction)
+    layout.addWidget(link)
+
+    buttons = QDialogButtonBox(QDialogButtonBox.Ok, parent=dialog)
+    buttons.accepted.connect(dialog.accept)
+    layout.addWidget(buttons)
+
+    dialog.exec_()

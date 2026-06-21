@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Callable, Dict, List, Optional, Tuple
 
-from PyQt5.QtCore import QPointF, QPoint, Qt, QEvent
+from PyQt5.QtCore import QPointF, QPoint, Qt, QEvent, QObject
 from PyQt5.QtGui import QClipboard, QFontMetrics, QKeyEvent, QPaintEvent, QPainter, QPen
 from PyQt5.QtWidgets import (
     QApplication,
@@ -25,7 +25,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from models.http_models import HeaderItem, HttpRequest
+from models.http_models import HeaderItem, HttpRequest, is_valid_header_name
 from services.curl_import import parse_curl_command
 from services.powershell_import import parse_powershell_command
 from ui.widgets import CHECK_MARK_COLOR
@@ -43,9 +43,11 @@ HEADER_TABLE_TOGGLE_SIZE = 16
 
 COPY_CURL_MENU_TEXT = 'Copy as Curl Command'
 COPY_POWERSHELL_MENU_TEXT = 'Copy as PowerShell Command'
-PASTE_HEADERS_MENU_TEXT = 'Paste Headers'
+COPY_SELECTED_HEADERS_MENU_TEXT = 'Copy Selected Headers (Ctrl+C)'
+PASTE_HEADERS_MENU_TEXT = 'Paste Headers (Ctrl+V)'
 PASTE_CURL_MENU_TEXT = 'Paste from Curl Command'
 PASTE_POWERSHELL_MENU_TEXT = 'Paste from PowerShell Command'
+DELETE_SELECTED_HEADERS_MENU_TEXT = 'Delete Selected Headers'
 
 
 def _compact_action_button(text: str) -> QPushButton:
@@ -76,7 +78,7 @@ def parse_headers_text(text: str) -> List[Tuple[str, str]]:
         key, _, value = line.partition(':')
         key = key.strip()
         value = value.strip()
-        if key:
+        if key and is_valid_header_name(key):
             rows.append((key, value))
     return rows
 
@@ -115,7 +117,28 @@ def _set_compact_table_header(table: QTableWidget, editable: bool = False, *, he
     v_header.setVisible(False)
     if header_table:
         table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        table.setSelectionMode(QAbstractItemView.SingleSelection)
+        table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+
+
+def _selected_rows(table: QTableWidget) -> List[int]:
+    return sorted({index.row() for index in table.selectedIndexes()})
+
+
+def _read_table_rows_for_rows(
+    table: QTableWidget,
+    key_col: int,
+    value_col: int,
+    rows: List[int],
+) -> List[Tuple[str, str]]:
+    result: List[Tuple[str, str]] = []
+    for row in rows:
+        key_item = table.item(row, key_col)
+        value_item = table.item(row, value_col)
+        key = key_item.text().strip() if key_item else ''
+        value = value_item.text() if value_item else ''
+        if key:
+            result.append((key, value))
+    return result
 
 
 def _read_table_rows(table: QTableWidget, key_col: int, value_col: int) -> List[Tuple[str, str]]:
@@ -139,6 +162,219 @@ def _show_paste_error(parent: QWidget, message: str) -> None:
     QMessageBox.information(parent, 'Paste failed', message)
 
 
+class HeaderTableInteraction(QObject):
+    def __init__(
+        self,
+        table: QTableWidget,
+        *,
+        key_col: int = 0,
+        value_col: int = 1,
+        paste_callback: Optional[Callable[[List[Tuple[str, str]]], None]] = None,
+        paste_request_callback: Optional[Callable[[HttpRequest], None]] = None,
+        curl_callback: Optional[Callable[[], None]] = None,
+        powershell_callback: Optional[Callable[[], None]] = None,
+        delete_rows_callback: Optional[Callable[[List[int]], None]] = None,
+    ):
+        super().__init__(table)
+        self._table = table
+        self._viewport = table.viewport()
+        self._key_col = key_col
+        self._value_col = value_col
+        self._paste_callback = paste_callback
+        self._paste_request_callback = paste_request_callback
+        self._curl_callback = curl_callback
+        self._powershell_callback = powershell_callback
+        self._delete_rows_callback = delete_rows_callback
+
+        table.setContextMenuPolicy(Qt.CustomContextMenu)
+        table.customContextMenuRequested.connect(self._on_context_menu)
+        table.installEventFilter(self)
+        self._viewport.installEventFilter(self)
+        table.destroyed.connect(self._on_table_destroyed)
+
+    def _on_table_destroyed(self, _obj: Optional[QObject] = None) -> None:
+        self._detach_filters()
+        self._table = None
+        self._viewport = None
+
+    def _detach_filters(self) -> None:
+        table = self._table
+        viewport = self._viewport
+        if table is not None:
+            try:
+                table.removeEventFilter(self)
+            except RuntimeError:
+                pass
+        if viewport is not None:
+            try:
+                viewport.removeEventFilter(self)
+            except RuntimeError:
+                pass
+
+    def _is_active(self) -> bool:
+        table = self._table
+        if table is None:
+            return False
+        try:
+            table.objectName()
+        except RuntimeError:
+            self._on_table_destroyed()
+            return False
+        return True
+
+    def eventFilter(self, obj, event) -> bool:
+        if not self._is_active():
+            return False
+
+        table = self._table
+        viewport = self._viewport
+        if viewport is not None and obj is viewport and event.type() == QEvent.MouseButtonPress:
+            mouse_event = event
+            try:
+                if mouse_event.button() == Qt.LeftButton and table.rowAt(mouse_event.pos().y()) < 0:
+                    table.clearSelection()
+            except RuntimeError:
+                self._on_table_destroyed()
+            return False
+
+        if table is None or obj is not table or event.type() != QEvent.KeyPress:
+            return super().eventFilter(obj, event)
+
+        key_event = event
+        if not isinstance(key_event, QKeyEvent):
+            return super().eventFilter(obj, event)
+        try:
+            if table.state() == QAbstractItemView.EditingState:
+                return super().eventFilter(obj, event)
+
+            if key_event.key() == Qt.Key_A and key_event.modifiers() & Qt.ControlModifier:
+                table.selectAll()
+                return True
+            if key_event.key() == Qt.Key_C and key_event.modifiers() & Qt.ControlModifier:
+                if self._copy_selected():
+                    return True
+            if (
+                key_event.key() == Qt.Key_V
+                and key_event.modifiers() & Qt.ControlModifier
+                and self._paste_callback is not None
+            ):
+                if self._paste_headers():
+                    return True
+            if key_event.key() == Qt.Key_Delete and self._delete_rows_callback is not None:
+                rows = _selected_rows(table)
+                if rows:
+                    self._delete_rows_callback(rows)
+                    return True
+        except RuntimeError:
+            self._on_table_destroyed()
+            return False
+        return super().eventFilter(obj, event)
+
+    def _copy_selected(self) -> bool:
+        if not self._is_active():
+            return False
+        table = self._table
+        try:
+            if table.state() == QAbstractItemView.EditingState:
+                return False
+            rows = _selected_rows(table)
+            if not rows:
+                return False
+            text = format_headers_text(
+                _read_table_rows_for_rows(table, self._key_col, self._value_col, rows)
+            )
+            if text:
+                _copy_to_clipboard(text)
+                return True
+        except RuntimeError:
+            self._on_table_destroyed()
+        return False
+
+    def _paste_headers(self) -> bool:
+        if not self._is_active() or self._paste_callback is None:
+            return False
+        table = self._table
+        try:
+            if table.state() == QAbstractItemView.EditingState:
+                return False
+            parsed = parse_headers_text(QApplication.clipboard().text())
+            if parsed:
+                self._paste_callback(parsed)
+                return True
+        except RuntimeError:
+            self._on_table_destroyed()
+        return False
+
+    def _on_context_menu(self, pos: 'QPoint') -> None:
+        if not self._is_active():
+            return
+        table = self._table
+        try:
+            selected_rows = _selected_rows(table)
+        except RuntimeError:
+            self._on_table_destroyed()
+            return
+        menu = QMenu(table)
+
+        copy_action = menu.addAction(COPY_SELECTED_HEADERS_MENU_TEXT)
+        copy_action.setEnabled(bool(selected_rows))
+        copy_all_action = menu.addAction('Copy All Headers')
+        delete_action = None
+        if self._delete_rows_callback is not None:
+            delete_action = menu.addAction(DELETE_SELECTED_HEADERS_MENU_TEXT)
+            delete_action.setEnabled(bool(selected_rows))
+        paste_action = None
+        paste_curl_action = None
+        paste_powershell_action = None
+        if self._paste_callback is not None or self._paste_request_callback is not None:
+            menu.addSeparator()
+        if self._paste_callback is not None:
+            paste_action = menu.addAction(PASTE_HEADERS_MENU_TEXT)
+        if self._paste_request_callback is not None:
+            paste_curl_action = menu.addAction(PASTE_CURL_MENU_TEXT)
+            paste_powershell_action = menu.addAction(PASTE_POWERSHELL_MENU_TEXT)
+        curl_action = None
+        powershell_action = None
+        if self._curl_callback is not None or self._powershell_callback is not None:
+            menu.addSeparator()
+        if self._curl_callback is not None:
+            curl_action = menu.addAction(COPY_CURL_MENU_TEXT)
+        if self._powershell_callback is not None:
+            powershell_action = menu.addAction(COPY_POWERSHELL_MENU_TEXT)
+
+        action = menu.exec_(table.viewport().mapToGlobal(pos))
+        if action is None:
+            return
+
+        if action == copy_action:
+            self._copy_selected()
+        elif delete_action is not None and action == delete_action:
+            if selected_rows:
+                self._delete_rows_callback(selected_rows)
+        elif action == copy_all_action:
+            text = format_headers_text(_read_table_rows(table, self._key_col, self._value_col))
+            if text:
+                _copy_to_clipboard(text)
+        elif paste_action is not None and action == paste_action:
+            self._paste_headers()
+        elif paste_curl_action is not None and action == paste_curl_action:
+            req = parse_curl_command(QApplication.clipboard().text())
+            if req is not None:
+                self._paste_request_callback(req)
+            else:
+                _show_paste_error(table, 'Could not parse a curl command from the clipboard.')
+        elif paste_powershell_action is not None and action == paste_powershell_action:
+            req = parse_powershell_command(QApplication.clipboard().text())
+            if req is not None:
+                self._paste_request_callback(req)
+            else:
+                _show_paste_error(table, 'Could not parse a PowerShell command from the clipboard.')
+        elif curl_action is not None and action == curl_action:
+            self._curl_callback()
+        elif powershell_action is not None and action == powershell_action:
+            self._powershell_callback()
+
+
 def attach_header_table_menu(
     table: QTableWidget,
     key_col: int = 0,
@@ -147,85 +383,20 @@ def attach_header_table_menu(
     paste_request_callback: Optional[Callable[[HttpRequest], None]] = None,
     curl_callback: Optional[Callable[[], None]] = None,
     powershell_callback: Optional[Callable[[], None]] = None,
-    delete_row_callback: Optional[Callable[[int], None]] = None,
-) -> None:
-    table.setContextMenuPolicy(Qt.CustomContextMenu)
-
-    def _on_context_menu(pos: 'QPoint') -> None:
-        row = table.rowAt(pos.y())
-        menu = QMenu(table)
-
-        copy_action = menu.addAction('Copy Header')
-        copy_action.setEnabled(row >= 0)
-        copy_all_action = menu.addAction('Copy All Headers')
-        delete_action = None
-        if delete_row_callback is not None:
-            delete_action = menu.addAction('Delete Header')
-            delete_action.setEnabled(row >= 0)
-        paste_action = None
-        paste_curl_action = None
-        paste_powershell_action = None
-        if paste_callback is not None or paste_request_callback is not None:
-            menu.addSeparator()
-        if paste_callback is not None:
-            paste_action = menu.addAction(PASTE_HEADERS_MENU_TEXT)
-        if paste_request_callback is not None:
-            paste_curl_action = menu.addAction(PASTE_CURL_MENU_TEXT)
-            paste_powershell_action = menu.addAction(PASTE_POWERSHELL_MENU_TEXT)
-        curl_action = None
-        powershell_action = None
-        if curl_callback is not None or powershell_callback is not None:
-            menu.addSeparator()
-        if curl_callback is not None:
-            curl_action = menu.addAction(COPY_CURL_MENU_TEXT)
-        if powershell_callback is not None:
-            powershell_action = menu.addAction(COPY_POWERSHELL_MENU_TEXT)
-
-        action = menu.exec_(table.viewport().mapToGlobal(pos))
-        if action is None:
-            return
-
-        if action == copy_action:
-            if row < 0:
-                return
-            key_item = table.item(row, key_col)
-            value_item = table.item(row, value_col)
-            key = key_item.text().strip() if key_item else ''
-            value = value_item.text() if value_item else ''
-            if key:
-                _copy_to_clipboard(format_header_line(key, value))
-        elif delete_action is not None and action == delete_action:
-            if row >= 0:
-                delete_row_callback(row)
-        elif action == copy_all_action:
-            text = format_headers_text(_read_table_rows(table, key_col, value_col))
-            if text:
-                _copy_to_clipboard(text)
-        elif paste_action is not None and action == paste_action:
-            clipboard = QApplication.clipboard()
-            parsed = parse_headers_text(clipboard.text())
-            if parsed:
-                paste_callback(parsed)
-            else:
-                _show_paste_error(table, 'No valid header lines found in the clipboard.')
-        elif paste_curl_action is not None and action == paste_curl_action:
-            req = parse_curl_command(QApplication.clipboard().text())
-            if req is not None:
-                paste_request_callback(req)
-            else:
-                _show_paste_error(table, 'Could not parse a curl command from the clipboard.')
-        elif paste_powershell_action is not None and action == paste_powershell_action:
-            req = parse_powershell_command(QApplication.clipboard().text())
-            if req is not None:
-                paste_request_callback(req)
-            else:
-                _show_paste_error(table, 'Could not parse a PowerShell command from the clipboard.')
-        elif curl_action is not None and action == curl_action:
-            curl_callback()
-        elif powershell_action is not None and action == powershell_action:
-            powershell_callback()
-
-    table.customContextMenuRequested.connect(_on_context_menu)
+    delete_rows_callback: Optional[Callable[[List[int]], None]] = None,
+) -> HeaderTableInteraction:
+    interaction = HeaderTableInteraction(
+        table,
+        key_col=key_col,
+        value_col=value_col,
+        paste_callback=paste_callback,
+        paste_request_callback=paste_request_callback,
+        curl_callback=curl_callback,
+        powershell_callback=powershell_callback,
+        delete_rows_callback=delete_rows_callback,
+    )
+    table._header_table_interaction = interaction
+    return interaction
 
 
 class TableEditDelegate(QStyledItemDelegate):
@@ -344,9 +515,8 @@ class RawHeadersEditor(QWidget):
             paste_request_callback=self._paste_request_callback,
             curl_callback=self._curl_copy_callback,
             powershell_callback=self._powershell_copy_callback,
-            delete_row_callback=self._delete_row,
+            delete_rows_callback=self._delete_rows,
         )
-        self.table.installEventFilter(self)
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 2, 0, 0)
         btn_layout.setSpacing(6)
@@ -361,21 +531,6 @@ class RawHeadersEditor(QWidget):
         layout.addLayout(btn_layout, 0)
 
         self._add_row()
-
-    def eventFilter(self, obj, event) -> bool:
-        if obj is self.table and event.type() == QEvent.KeyPress:
-            key_event = event
-            if (
-                isinstance(key_event, QKeyEvent)
-                and key_event.key() == Qt.Key_Delete
-                and self.table.state() != QAbstractItemView.EditingState
-                and (self.table.hasFocus() or self.table.viewport().hasFocus())
-            ):
-                row = self.table.currentRow()
-                if row >= 0:
-                    self._delete_row(row)
-                    return True
-        return super().eventFilter(obj, event)
 
     def _add_row(self, item: Optional[HeaderItem] = None) -> None:
         row = self.table.rowCount()
@@ -434,23 +589,20 @@ class RawHeadersEditor(QWidget):
                         toggle.setChecked(True)
                     key_to_row[lower_key] = empty_row
 
-    def _delete_row(self, row: int) -> None:
-        if row < 0 or row >= self.table.rowCount():
-            return
-        self.table.removeRow(row)
+    def _delete_rows(self, rows: List[int]) -> None:
+        for row in sorted(rows, reverse=True):
+            if 0 <= row < self.table.rowCount():
+                self.table.removeRow(row)
         if self.table.rowCount() == 0:
             self._add_row()
 
     def _remove_selected_rows(self) -> None:
-        rows = sorted({idx.row() for idx in self.table.selectedIndexes()}, reverse=True)
+        rows = _selected_rows(self.table)
         if not rows:
             row = self.table.currentRow()
             if row >= 0:
                 rows = [row]
-        for row in rows:
-            self.table.removeRow(row)
-        if self.table.rowCount() == 0:
-            self._add_row()
+        self._delete_rows(rows)
 
     def _get_toggle(self, row: int) -> Optional[CheckMarkToggle]:
         widget = self.table.cellWidget(row, 0)

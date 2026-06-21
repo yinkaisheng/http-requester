@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QClipboard
+from PyQt5.QtGui import QClipboard, QShowEvent
 from PyQt5.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -157,6 +157,7 @@ class RequestTab(QWidget):
         self._record = record
         self._draft_name = ''
         self._cached_response: Optional[dict] = None
+        self._splitter_ratios: Optional[Dict[str, float]] = None
         self._init_ui()
         if record:
             self.load_record(record)
@@ -284,15 +285,39 @@ class RequestTab(QWidget):
         self.content_splitter.addWidget(self.right_splitter)
         self.content_splitter.setStretchFactor(0, 1)
         self.content_splitter.setStretchFactor(1, 1)
-        QTimer.singleShot(0, self.apply_default_splitter_sizes)
+        for splitter in (self.content_splitter, self.left_splitter, self.right_splitter):
+            splitter.splitterMoved.connect(self._on_splitter_moved)
         layout.addWidget(self.content_splitter, 1)
 
-    def get_splitter_state(self) -> dict:
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        if self._splitter_ratios:
+            self._apply_splitter_sizes_now(self._splitter_ratios)
+        else:
+            self.apply_default_splitter_sizes()
+
+    def _on_splitter_moved(self, _pos: int, _index: int) -> None:
+        if not self.isVisible():
+            return
+        if self.content_splitter.width() <= 0:
+            return
+        self._splitter_ratios = {
+            'content': splitter_sizes_to_ratio(self.content_splitter.sizes()),
+            'left': splitter_sizes_to_ratio(self.left_splitter.sizes()),
+            'right': splitter_sizes_to_ratio(self.right_splitter.sizes()),
+        }
+
+    def _ratios_from_widgets(self) -> dict:
         return {
             'content': splitter_sizes_to_ratio(self.content_splitter.sizes()),
             'left': splitter_sizes_to_ratio(self.left_splitter.sizes()),
             'right': splitter_sizes_to_ratio(self.right_splitter.sizes()),
         }
+
+    def get_splitter_state(self) -> dict:
+        if self._splitter_ratios:
+            return dict(self._splitter_ratios)
+        return self._ratios_from_widgets()
 
     def set_splitter_state(self, state: Optional[dict]) -> None:
         if not state:
@@ -303,29 +328,36 @@ class RequestTab(QWidget):
             right=state.get('right'),
         )
 
-    def apply_splitter_sizes(
-        self,
-        content: Optional[float] = None,
-        left: Optional[float] = None,
-        right: Optional[float] = None,
-    ) -> None:
-        """Apply splitter ratios once layout is ready; missing values use defaults."""
-
+    def _apply_splitter_sizes_now(self, ratios: Dict[str, float]) -> None:
         def _apply() -> None:
+            if not self.isVisible():
+                return
             lh = self.left_splitter.height()
             rh = self.right_splitter.height()
             cw = self.content_splitter.width()
             if lh <= 0 or rh <= 0 or cw <= 0:
                 QTimer.singleShot(50, _apply)
                 return
-            content_ratio = content if _valid_ratio(content) else DEFAULT_CONTENT_RATIO
-            left_ratio = left if _valid_ratio(left) else DEFAULT_PANEL_RATIO
-            right_ratio = right if _valid_ratio(right) else DEFAULT_PANEL_RATIO
-            self.content_splitter.setSizes(splitter_ratio_to_sizes(cw, content_ratio))
-            self.left_splitter.setSizes(splitter_ratio_to_sizes(lh, left_ratio))
-            self.right_splitter.setSizes(splitter_ratio_to_sizes(rh, right_ratio))
+            self.content_splitter.setSizes(splitter_ratio_to_sizes(cw, ratios['content']))
+            self.left_splitter.setSizes(splitter_ratio_to_sizes(lh, ratios['left']))
+            self.right_splitter.setSizes(splitter_ratio_to_sizes(rh, ratios['right']))
 
         QTimer.singleShot(0, _apply)
+
+    def apply_splitter_sizes(
+        self,
+        content: Optional[float] = None,
+        left: Optional[float] = None,
+        right: Optional[float] = None,
+    ) -> None:
+        """Store splitter ratios and apply them when the tab is visible and laid out."""
+        ratios = {
+            'content': content if _valid_ratio(content) else DEFAULT_CONTENT_RATIO,
+            'left': left if _valid_ratio(left) else DEFAULT_PANEL_RATIO,
+            'right': right if _valid_ratio(right) else DEFAULT_PANEL_RATIO,
+        }
+        self._splitter_ratios = ratios
+        self._apply_splitter_sizes_now(ratios)
 
     def apply_default_splitter_sizes(self) -> None:
         self.apply_splitter_sizes()
@@ -468,9 +500,9 @@ class RequestTab(QWidget):
             self._clear_response_display()
         splitters = state.get('splitters')
         if splitters:
-            QTimer.singleShot(0, lambda s=splitters: self.set_splitter_state(s))
+            self.set_splitter_state(splitters)
         else:
-            QTimer.singleShot(0, self.apply_default_splitter_sizes)
+            self._splitter_ratios = None
 
     def _set_status_style(self, style_id: str) -> None:
         self.status_label.setObjectName(style_id)
