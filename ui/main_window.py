@@ -28,11 +28,9 @@ from ui.history_panel import HistoryPanel
 from ui.request_tab import RequestTab, splitter_ratio_to_sizes, splitter_sizes_to_ratio
 from ui.request_tab_widget import RequestTabWidget
 from ui.theme import (
-    CURRENT_THEME_VERSION,
     apply_app_theme,
     default_body_text_font_family,
     default_body_text_font_size_px,
-    migrate_session_theme,
     normalize_body_text_font_family,
     normalize_body_text_font_size,
     normalize_theme_name,
@@ -145,9 +143,7 @@ class MainWindow(QMainWindow):
         session = self.session_store.load()
         window = session.get('window', {})
 
-        theme = normalize_theme_name(
-            migrate_session_theme(session.get('theme'), session.get('theme_version'))
-        )
+        theme = normalize_theme_name(session.get('theme'))
         self._theme = theme
         self._body_text_font_size = normalize_body_text_font_size(session.get('body_text_font_size'))
         self._body_text_font_family = normalize_body_text_font_family(session.get('body_text_font_family'))
@@ -206,7 +202,6 @@ class MainWindow(QMainWindow):
         self.session_store.save({
             'version': 1,
             'theme': self._current_theme(),
-            'theme_version': CURRENT_THEME_VERSION,
             'body_text_font_size': self._body_text_font_size,
             'body_text_font_family': self._body_text_font_family,
             'window': window_state,

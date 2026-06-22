@@ -17,12 +17,12 @@ if 'python' not in exe_path.name.lower():
 else:
     os.chdir(script_path.parent)
 
+from storage.app_config import init_app_config
 from storage.session_store import SessionStore
 from ui.main_window import MainWindow
 from ui.theme import (
     apply_app_font,
     apply_app_theme,
-    migrate_session_theme,
     normalize_body_text_font_family,
     normalize_body_text_font_size,
     normalize_theme_name,
@@ -37,6 +37,7 @@ def _load_app_icon() -> QIcon:
 
 
 def run_qt_app():
+    init_app_config()
     app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create('Fusion'))
     app.setApplicationName('HTTP Requester')
@@ -44,9 +45,7 @@ def run_qt_app():
     if not icon.isNull():
         app.setWindowIcon(icon)
     session = SessionStore().load()
-    theme = normalize_theme_name(
-        migrate_session_theme(session.get('theme'), session.get('theme_version'))
-    )
+    theme = normalize_theme_name(session.get('theme'))
     body_text_font_size = normalize_body_text_font_size(session.get('body_text_font_size'))
     body_text_font_family = normalize_body_text_font_family(session.get('body_text_font_family'))
     apply_app_font(app)

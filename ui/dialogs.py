@@ -28,6 +28,7 @@ from ui.theme import (
     THEME_OPTIONS,
     ThemeName,
     default_body_text_font_family,
+    format_link_html,
     normalize_body_text_font_family,
     normalize_theme_name,
 )
@@ -269,7 +270,7 @@ def show_about_dialog(parent: QWidget) -> None:
     version.setAlignment(Qt.AlignCenter)
     layout.addWidget(version)
 
-    link = QLabel(f'<a href="{GITHUB_URL}">{GITHUB_URL}</a>')
+    link = QLabel(format_link_html(GITHUB_URL))
     link.setAlignment(Qt.AlignCenter)
     link.setOpenExternalLinks(True)
     link.setTextInteractionFlags(Qt.TextBrowserInteraction)

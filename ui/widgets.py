@@ -19,12 +19,11 @@ from PyQt5.QtWidgets import (
     QStyledItemDelegate,
 )
 
-from ui.theme import popup_list_font
+from ui.theme import check_mark_color, popup_list_font
 
 ARROW_GLYPH_BASE_PX = 8
 ARROW_GLYPH_HEIGHT_PX = 6
 COMBO_DROPDOWN_WIDTH_PX = 26
-CHECK_MARK_COLOR = QColor('#ffffff')
 
 
 def _arrow_color(widget) -> QColor:
@@ -42,7 +41,7 @@ def _paint_check_mark(painter: QPainter, rect: QRect) -> None:
     y2 = rect.y() + side * 0.3
 
     painter.setRenderHint(QPainter.Antialiasing, True)
-    pen = QPen(CHECK_MARK_COLOR)
+    pen = QPen(check_mark_color())
     pen.setWidthF(max(1.6, side * 0.12))
     pen.setCapStyle(Qt.RoundCap)
     pen.setJoinStyle(Qt.RoundJoin)

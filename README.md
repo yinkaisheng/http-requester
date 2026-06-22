@@ -142,7 +142,7 @@ Not every curl or pwsh option is supported (e.g. cookies, proxies, redirects). P
 ### UI
 
 - **Settings** — click **⚙** next to **+ New Request** for theme, editor font family/size; **Apply** saves without closing the dialog
-- **Themes** — Solarized Light, Light, and Dark
+- **Themes** — Solarized Light, Light, and Dark; colors are editable in `config/config.json` under `themes`
 - **Clean UI** — Fusion style with consistent tables, tabs, and context menus
 
 ## Usage
@@ -162,9 +162,23 @@ Local data is stored under `config/` next to the executable (or project root whe
 
 | Path | Purpose |
 |------|---------|
+| `config/config.json` | App tuning and per-theme colors; created automatically on first run if missing |
 | `config/history.json` | History list metadata (id, name, method, URL, status code/reason, time) |
 | `config/records/{id}.json` | Full request/response payload per history entry |
 | `config/session.json` | Theme, font settings, window size, splitter layout, and open tabs |
+
+`config.json` keys:
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `version` | `1` | Config file version |
+| `json_format_max_bytes` | `5242880` (5 MB) | Max response body size for JSON pretty-print and JSON Tree |
+| `binary_hex_preview_bytes` | `10240` (10 KB) | Binary hex preview length in Raw view |
+| `binary_hex_line_width` | `8` | Hex bytes per line in binary preview |
+| `tab_title_max_width` | `400` | Max tab title width in pixels |
+| `themes` | — | Per-theme UI colors (`solarized`, `light`, `dark`); see `THEME_COLOR_DOCS` in `ui/theme_defaults.py` |
+
+Edit `config/config.json` and restart the app to apply changes.
 
 These paths are listed in `.gitignore` and are not committed to version control.
 

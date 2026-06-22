@@ -10,12 +10,12 @@ from PyQt5.QtWidgets import QMenu, QPushButton, QTabBar, QTabWidget, QWidget
 
 from models.http_models import HistoryRecord
 from pyqt_async_task import AsyncTask
+from storage.app_config import get_app_config
 from storage.history_store import HistoryStore
 from ui.dialogs import prompt_text
 from ui.request_tab import RequestTab
 
 TAB_CLOSE_BUTTON_TEXT = '\u00d7'
-TAB_TITLE_MAX_WIDTH = 400
 
 
 class RequestTabWidget(QTabWidget):
@@ -61,10 +61,11 @@ class RequestTabWidget(QTabWidget):
         return index
 
     def _format_tab_bar_title(self, title: str) -> str:
+        max_width = get_app_config().tab_title_max_width
         metrics = QFontMetrics(self.font())
-        if metrics.horizontalAdvance(title) <= TAB_TITLE_MAX_WIDTH:
+        if metrics.horizontalAdvance(title) <= max_width:
             return title
-        return metrics.elidedText(title, Qt.ElideRight, TAB_TITLE_MAX_WIDTH)
+        return metrics.elidedText(title, Qt.ElideRight, max_width)
 
     def _update_tab_text(self, index: int, tab: RequestTab) -> None:
         full_title = tab.tab_title()

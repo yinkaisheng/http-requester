@@ -27,19 +27,13 @@ from PyQt5.QtWidgets import (
 )
 
 from models.http_models import is_text_body
+from storage.app_config import get_app_config
 from ui.body_editor import BodyEditor
 from ui.notifications import show_system_tip
 
 _VIEW_RAW = 0
 _VIEW_JSON = 1
 _VIEW_JSON_TREE = 2
-
-MAX_PRETTY_PRINT_BYTES = 5 * 1024 * 1024  # 5 MB
-BINARY_HEX_PREVIEW_BYTES = 1024 * 10
-BINARY_HEX_LINE_WIDTH = 8
-_JSON_FORMAT_LIMIT_TIP = (
-    'Response body exceeds 5 MB; JSON formatting and tree view are unavailable.'
-)
 
 _CONTENT_TYPE_EXTENSIONS = {
     'text/html': '.html',
@@ -99,9 +93,14 @@ def _ascii_repr(chunk: bytes) -> str:
 
 def format_hex_preview(
     data: bytes,
-    preview_bytes: int = BINARY_HEX_PREVIEW_BYTES,
-    line_width: int = BINARY_HEX_LINE_WIDTH,
+    preview_bytes: Optional[int] = None,
+    line_width: Optional[int] = None,
 ) -> str:
+    cfg = get_app_config()
+    if preview_bytes is None:
+        preview_bytes = cfg.binary_hex_preview_bytes
+    if line_width is None:
+        line_width = cfg.binary_hex_line_width
     preview = data[:preview_bytes]
     hex_column_width = line_width * 3 - 1
     lines = []
@@ -128,7 +127,7 @@ def _looks_like_json(body_text: str) -> bool:
 
 
 def _pretty_print_json_body(body_text: str) -> str:
-    if len(body_text.encode('utf-8')) > MAX_PRETTY_PRINT_BYTES:
+    if len(body_text.encode('utf-8')) > get_app_config().json_format_max_bytes:
         return body_text
     if not _looks_like_json(body_text):
         return body_text
@@ -322,13 +321,26 @@ class ResponseBodyPanel(QWidget):
         return len(self._raw_body.encode('utf-8'))
 
     def _exceeds_json_format_limit(self) -> bool:
-        return self._body_byte_size() > MAX_PRETTY_PRINT_BYTES
+        return self._body_byte_size() > get_app_config().json_format_max_bytes
+
+    def _json_format_limit_tip(self) -> str:
+        limit_bytes = get_app_config().json_format_max_bytes
+        if limit_bytes % (1024 * 1024) == 0:
+            limit_label = f'{limit_bytes // (1024 * 1024)} MB'
+        elif limit_bytes % 1024 == 0:
+            limit_label = f'{limit_bytes // 1024} KB'
+        else:
+            limit_label = f'{limit_bytes} bytes'
+        return (
+            f'Response body exceeds {limit_label}; '
+            'JSON formatting and tree view are unavailable.'
+        )
 
     def _is_body_json(self) -> bool:
         return _looks_like_json(self._raw_body)
 
     def _notify_json_format_limit(self) -> None:
-        show_system_tip('HTTP Requester', _JSON_FORMAT_LIMIT_TIP, widget=self)
+        show_system_tip('HTTP Requester', self._json_format_limit_tip(), widget=self)
 
     def _revert_to_raw_view(self) -> None:
         self.view_group.blockSignals(True)

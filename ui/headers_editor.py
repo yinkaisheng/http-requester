@@ -30,7 +30,7 @@ from models.http_models import HeaderItem, HttpRequest, is_valid_header_name
 from services.curl_import import parse_curl_command
 from services.powershell_import import parse_powershell_command
 from ui.dialogs import prompt_basic_auth, prompt_bearer_token
-from ui.widgets import CHECK_MARK_COLOR
+from ui.theme import check_mark_color
 
 TABLE_HEADER_HEIGHT = 22
 HEADER_ROW_HEIGHT = 24
@@ -490,7 +490,7 @@ class CheckMarkToggle(QPushButton):
         painter = QPainter(self)
         try:
             painter.setRenderHint(QPainter.Antialiasing, True)
-            pen = QPen(CHECK_MARK_COLOR)
+            pen = QPen(check_mark_color())
             pen.setWidthF(max(1.6, side * 0.12))
             pen.setCapStyle(Qt.RoundCap)
             pen.setJoinStyle(Qt.RoundJoin)
