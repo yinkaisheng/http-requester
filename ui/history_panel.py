@@ -12,7 +12,6 @@ from PyQt5.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMenu,
-    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -20,6 +19,8 @@ from PyQt5.QtWidgets import (
 
 from models.http_models import HistoryRecord
 from storage.history_store import HistoryStore
+from i18n import tr
+from ui.dialog_i18n import ask_yes_no
 from ui.dialogs import prompt_text
 
 DELETE_BUTTON_WIDTH = 28
@@ -51,7 +52,7 @@ class HistoryItemWidget(QWidget):
         self.delete_btn = QPushButton('×')
         self.delete_btn.setObjectName('historyDeleteButton')
         self.delete_btn.setFixedSize(DELETE_BUTTON_WIDTH, DELETE_BUTTON_WIDTH)
-        self.delete_btn.setToolTip('Delete')
+        self.delete_btn.setToolTip(tr('history.delete_tooltip'))
         self.delete_btn.clicked.connect(self.delete_clicked.emit)
         layout.addWidget(self.delete_btn)
 
@@ -107,9 +108,9 @@ class HistoryPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
 
-        title = QLabel('History')
-        title.setObjectName('panelTitle')
-        layout.addWidget(title)
+        self._title_label = QLabel(tr('history.title'))
+        self._title_label.setObjectName('panelTitle')
+        layout.addWidget(self._title_label)
 
         self.list_widget = QListWidget()
         self.list_widget.setSpacing(0)
@@ -117,6 +118,11 @@ class HistoryPanel(QWidget):
         self.list_widget.customContextMenuRequested.connect(self._show_context_menu)
         self.list_widget.viewport().installEventFilter(self)
         layout.addWidget(self.list_widget)
+
+    def retranslate_ui(self) -> None:
+        self._title_label.setText(tr('history.title'))
+        for widget in self._item_widgets.values():
+            widget.delete_btn.setToolTip(tr('history.delete_tooltip'))
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         if obj is self.list_widget.viewport() and event.type() == QEvent.Resize:
@@ -203,12 +209,12 @@ class HistoryPanel(QWidget):
             return
 
         menu = QMenu(self)
-        rename_action = menu.addAction('Rename')
-        delete_action = menu.addAction('Delete')
+        rename_action = menu.addAction(tr('tab.rename'))
+        delete_action = menu.addAction(tr('history.delete'))
         menu.addSeparator()
-        delete_others_action = menu.addAction('Delete Others Except This')
-        delete_same_action = menu.addAction('Delete Same Method && URL Except This')
-        delete_all_action = menu.addAction('Delete ALL')
+        delete_others_action = menu.addAction(tr('history.delete_others'))
+        delete_same_action = menu.addAction(tr('history.delete_same'))
+        delete_all_action = menu.addAction(tr('history.delete_all'))
         action = menu.exec_(self.list_widget.mapToGlobal(pos))
 
         if action == rename_action:
@@ -228,8 +234,8 @@ class HistoryPanel(QWidget):
             return
         new_name = prompt_text(
             self,
-            'Rename',
-            'Request name:',
+            tr('tab.rename_title'),
+            tr('tab.rename_label'),
             record.name or record.display_name(),
             allow_empty=True,
         )
@@ -241,15 +247,10 @@ class HistoryPanel(QWidget):
             self.record_renamed.emit(record_id, new_name)
             self.records_changed.emit()
 
-    def _confirm(self, message: str, title: str = 'Confirm Delete') -> bool:
-        reply = QMessageBox.question(
-            self,
-            title,
-            message,
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
-        )
-        return reply == QMessageBox.Yes
+    def _confirm(self, message: str, title: str = '') -> bool:
+        if not title:
+            title = tr('history.confirm_delete')
+        return ask_yes_no(self, title, message)
 
     def _delete_records(self, record_ids: List[str], confirm: bool, message: str) -> None:
         if not record_ids:
@@ -270,7 +271,7 @@ class HistoryPanel(QWidget):
         self._delete_records(
             [record_id],
             confirm,
-            'Are you sure you want to delete this history record?',
+            tr('history.confirm_delete_one'),
         )
 
     def _delete_others_except(self, record_id: str, confirm: bool = False) -> None:
@@ -278,7 +279,7 @@ class HistoryPanel(QWidget):
         self._delete_records(
             ids,
             confirm,
-            f'Delete all other history records ({len(ids)} item(s))?',
+            tr('history.confirm_delete_others', count=len(ids)),
         )
 
     def _delete_same_method_url_except(self, record_id: str, confirm: bool = False) -> None:
@@ -286,7 +287,7 @@ class HistoryPanel(QWidget):
         self._delete_records(
             ids,
             confirm,
-            f'Delete other records with the same method and URL ({len(ids)} item(s))?',
+            tr('history.confirm_delete_same', count=len(ids)),
         )
 
     def _delete_all(self, confirm: bool = False) -> None:
@@ -294,7 +295,7 @@ class HistoryPanel(QWidget):
         self._delete_records(
             ids,
             confirm,
-            f'Delete all history records ({len(ids)} item(s))?',
+            tr('history.confirm_delete_all', count=len(ids)),
         )
 
     def get_record(self, record_id: str) -> Optional[HistoryRecord]:

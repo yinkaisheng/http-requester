@@ -12,6 +12,7 @@ from models.http_models import HistoryRecord
 from pyqt_async_task import AsyncTask
 from storage.app_config import get_app_config
 from storage.history_store import HistoryStore
+from i18n import tr
 from ui.dialogs import prompt_text
 from ui.request_tab import RequestTab
 
@@ -70,6 +71,12 @@ class RequestTabWidget(QTabWidget):
             self.new_request()
             return True
         return super().eventFilter(obj, event)
+
+    def retranslate_ui(self) -> None:
+        for index in range(self.count()):
+            widget = self.widget(index)
+            if isinstance(widget, RequestTab):
+                widget.retranslate_ui()
 
     def addTab(self, widget: QWidget, label: str) -> int:
         if isinstance(widget, RequestTab):
@@ -260,11 +267,11 @@ class RequestTabWidget(QTabWidget):
             return
 
         menu = QMenu(self)
-        rename_action = menu.addAction('Rename')
+        rename_action = menu.addAction(tr('tab.rename'))
         close_others_action = None
         if self.count() > 1:
             menu.addSeparator()
-            close_others_action = menu.addAction('Close Other Tabs')
+            close_others_action = menu.addAction(tr('tab.close_others'))
         action = menu.exec_(self.tabBar().mapToGlobal(pos))
         if action == rename_action:
             self._rename_tab_at_index(index)
@@ -277,8 +284,8 @@ class RequestTabWidget(QTabWidget):
             return
         new_name = prompt_text(
             self,
-            'Rename',
-            'Request name:',
+            tr('tab.rename_title'),
+            tr('tab.rename_label'),
             widget.tab_title(),
             allow_empty=True,
         )

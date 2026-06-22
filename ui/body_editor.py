@@ -7,7 +7,6 @@ from typing import List, Optional
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QButtonGroup,
-    QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -22,6 +21,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from i18n import tr
+from ui.dialog_i18n import get_open_file_name
 from models.http_models import BodyType, FormField
 from ui.headers_editor import (
     TableEditDelegate,
@@ -54,10 +55,10 @@ class BodyEditor(QWidget):
         layout.setSpacing(0)
 
         self.type_group = QButtonGroup(self)
-        self.radio_raw = QRadioButton('Raw')
-        self.radio_json = QRadioButton('JSON')
-        self.radio_form = QRadioButton('Form Data')
-        self.radio_file = QRadioButton('File Upload')
+        self.radio_raw = QRadioButton(tr('body.raw'))
+        self.radio_json = QRadioButton(tr('body.json'))
+        self.radio_form = QRadioButton(tr('body.form_data'))
+        self.radio_file = QRadioButton(tr('body.file_upload'))
         self.radio_raw.setChecked(True)
         for i, radio in enumerate([
             self.radio_raw, self.radio_json,
@@ -77,14 +78,24 @@ class BodyEditor(QWidget):
         self.type_group.buttonClicked.connect(self._on_type_changed)
         self._on_type_changed()
 
+    def retranslate_ui(self) -> None:
+        self._title_label.setText(tr('body.request_body'))
+        self.radio_raw.setText(tr('body.raw'))
+        self.radio_json.setText(tr('body.json'))
+        self.radio_form.setText(tr('body.form_data'))
+        self.radio_file.setText(tr('body.file_upload'))
+        self._form_add_btn.setText(tr('body.add'))
+        self._form_remove_btn.setText(tr('body.remove'))
+        self._browse_btn.setText(tr('body.choose_file'))
+
     def _build_header_row(self) -> QWidget:
         row = QWidget()
         header_layout = QHBoxLayout(row)
         configure_section_header_layout(header_layout)
-        title = QLabel('Request Body')
-        title.setObjectName('sectionTitle')
-        title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        add_section_header_widget(header_layout, title)
+        self._title_label = QLabel(tr('body.request_body'))
+        self._title_label.setObjectName('sectionTitle')
+        self._title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        add_section_header_widget(header_layout, self._title_label)
         for radio in (
             self.radio_raw, self.radio_json,
             self.radio_form, self.radio_file,
@@ -99,7 +110,7 @@ class BodyEditor(QWidget):
         page_layout.setContentsMargins(0, 0, 0, 0)
         self.text_edit = QPlainTextEdit()
         self.text_edit.setObjectName('bodyTextEdit')
-        self.text_edit.setPlaceholderText('Request body content')
+        self.text_edit.setPlaceholderText(tr('body.text_placeholder'))
         page_layout.addWidget(self.text_edit)
         self.stack.addWidget(page)
 
@@ -109,7 +120,7 @@ class BodyEditor(QWidget):
         page_layout.setContentsMargins(0, 0, 0, 0)
 
         self.form_table = QTableWidget(0, 4)
-        self.form_table.setHorizontalHeaderLabels(['Key', 'Value', 'File', 'File Path'])
+        self.form_table.setHorizontalHeaderLabels([tr('body.form_key'), tr('body.form_value'), tr('body.form_file'), tr('body.form_path')])
         self.form_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
         self.form_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.form_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -124,12 +135,12 @@ class BodyEditor(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 2, 0, 0)
         btn_layout.setSpacing(6)
-        add_btn = _compact_action_button('+ Add')
-        remove_btn = _compact_action_button('- Remove')
-        add_btn.clicked.connect(self._add_form_row)
-        remove_btn.clicked.connect(self._remove_form_rows)
-        btn_layout.addWidget(add_btn)
-        btn_layout.addWidget(remove_btn)
+        self._form_add_btn = _compact_action_button(tr('body.add'))
+        self._form_remove_btn = _compact_action_button(tr('body.remove'))
+        self._form_add_btn.clicked.connect(self._add_form_row)
+        self._form_remove_btn.clicked.connect(self._remove_form_rows)
+        btn_layout.addWidget(self._form_add_btn)
+        btn_layout.addWidget(self._form_remove_btn)
         btn_layout.addStretch()
         page_layout.addLayout(btn_layout)
 
@@ -142,14 +153,14 @@ class BodyEditor(QWidget):
         page_layout.setContentsMargins(0, 0, 0, 0)
 
         file_layout = QHBoxLayout()
-        file_layout.addWidget(QLabel('File:'))
+        file_layout.addWidget(QLabel(tr('body.file_label')))
         self.file_path_edit = QLineEdit()
         self.file_path_edit.setReadOnly(True)
-        self.file_path_edit.setPlaceholderText('Select a file to upload')
-        browse_btn = QPushButton('Select File')
-        browse_btn.clicked.connect(self._browse_single_file)
+        self.file_path_edit.setPlaceholderText(tr('body.file_placeholder'))
+        self._browse_btn = QPushButton(tr('body.choose_file'))
+        self._browse_btn.clicked.connect(self._browse_single_file)
         file_layout.addWidget(self.file_path_edit)
-        file_layout.addWidget(browse_btn)
+        file_layout.addWidget(self._browse_btn)
         page_layout.addLayout(file_layout)
         page_layout.addStretch()
         self.stack.addWidget(page)
@@ -179,7 +190,7 @@ class BodyEditor(QWidget):
         is_file_widget = QWidget()
         is_file_layout = QHBoxLayout(is_file_widget)
         is_file_layout.setContentsMargins(2, FORM_CELL_MARGIN_V, 2, FORM_CELL_MARGIN_V)
-        is_file_btn = QPushButton('Yes' if (field and field.is_file) else 'No')
+        is_file_btn = QPushButton(tr('body.yes') if (field and field.is_file) else tr('body.no'))
         is_file_btn.setObjectName('formCellButton')
         is_file_btn.setCheckable(True)
         is_file_btn.setChecked(field.is_file if field else False)
@@ -240,7 +251,7 @@ class BodyEditor(QWidget):
         widget = self.form_table.cellWidget(row, 2)
         btn = widget.findChild(QPushButton)
         if btn:
-            btn.setText('Yes' if is_file else 'No')
+            btn.setText(tr('body.yes') if is_file else tr('body.no'))
         value_item = self.form_table.item(row, 1)
         if value_item:
             if is_file:
@@ -250,7 +261,7 @@ class BodyEditor(QWidget):
                 value_item.setFlags(value_item.flags() | Qt.ItemIsEditable)
 
     def _browse_form_file(self, row: int) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, 'Select File')
+        path, _ = get_open_file_name(self, tr('body.select_file_title'))
         if not path:
             return
         path_widget = self.form_table.cellWidget(row, 3)
@@ -259,7 +270,7 @@ class BodyEditor(QWidget):
             path_edit.setText(path)
 
     def _browse_single_file(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, 'Select File')
+        path, _ = get_open_file_name(self, tr('body.select_file_title'))
         if path:
             self.file_path_edit.setText(path)
 

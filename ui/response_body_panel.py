@@ -10,11 +10,9 @@ from PyQt5.QtGui import QClipboard, QPainter, QPixmap
 from PyQt5.QtWidgets import (
     QApplication,
     QButtonGroup,
-    QFileDialog,
     QHBoxLayout,
     QLabel,
     QMenu,
-    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QRadioButton,
@@ -28,6 +26,8 @@ from PyQt5.QtWidgets import (
 
 from models.http_models import is_text_body
 from storage.app_config import get_app_config
+from i18n import tr
+from ui.dialog_i18n import get_save_file_name, message_warning
 from ui.headers_editor import (
     _compact_action_button,
     add_section_header_widget,
@@ -115,7 +115,7 @@ def format_hex_preview(
         lines.append(f'{offset:08x}  {hex_part}  {ascii_part}')
     if len(data) > preview_bytes:
         remaining = len(data) - preview_bytes
-        lines.append(f'... ({remaining} more bytes, {len(data)} bytes total)')
+        lines.append(tr('response.hex_more_bytes', count=remaining, total=len(data)))
     return '\n'.join(lines)
 
 
@@ -244,14 +244,14 @@ class ResponseBodyPanel(QWidget):
         layout.setSpacing(0)
 
         self.view_group = QButtonGroup(self)
-        self.radio_raw = QRadioButton('Raw')
-        self.radio_json = QRadioButton('JSON')
-        self.radio_tree = QRadioButton('JSON Tree')
+        self.radio_raw = QRadioButton(tr('response.raw'))
+        self.radio_json = QRadioButton(tr('response.json'))
+        self.radio_tree = QRadioButton(tr('response.json_tree'))
         self.radio_raw.setChecked(True)
         for view_id, radio in enumerate([self.radio_raw, self.radio_json, self.radio_tree]):
             self.view_group.addButton(radio, view_id)
 
-        self.save_raw_btn = _compact_action_button('Save Raw')
+        self.save_raw_btn = _compact_action_button(tr('response.save_raw'))
         self.save_raw_btn.setVisible(False)
         self.save_raw_btn.clicked.connect(self._save_raw)
 
@@ -263,7 +263,7 @@ class ResponseBodyPanel(QWidget):
         self.text_edit = QPlainTextEdit()
         self.text_edit.setObjectName('bodyTextEdit')
         self.text_edit.setReadOnly(True)
-        self.text_edit.setPlaceholderText('Response will appear here')
+        self.text_edit.setPlaceholderText(tr('response.placeholder'))
         self.stack.addWidget(self.text_edit)
 
         self._tree_page = QWidget()
@@ -276,7 +276,7 @@ class ResponseBodyPanel(QWidget):
 
         self.json_tree = QTreeWidget()
         self.json_tree.setObjectName('jsonTree')
-        self.json_tree.setHeaderLabels(['Key', 'Value'])
+        self.json_tree.setHeaderLabels([tr('response.key'), tr('response.value')])
         self.json_tree.setColumnWidth(0, 200)
         self.json_tree.setAlternatingRowColors(True)
         self.json_tree.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -302,15 +302,24 @@ class ResponseBodyPanel(QWidget):
         row = QWidget()
         header_layout = QHBoxLayout(row)
         configure_section_header_layout(header_layout)
-        title = QLabel('Response Body')
-        title.setObjectName('sectionTitle')
-        title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        add_section_header_widget(header_layout, title)
+        self._title_label = QLabel(tr('response.response_body'))
+        self._title_label.setObjectName('sectionTitle')
+        self._title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        add_section_header_widget(header_layout, self._title_label)
         for radio in (self.radio_raw, self.radio_json, self.radio_tree):
             add_section_header_widget(header_layout, radio)
         add_section_header_widget(header_layout, self.save_raw_btn)
         header_layout.addStretch()
         return row
+
+    def retranslate_ui(self) -> None:
+        self._title_label.setText(tr('response.response_body'))
+        self.radio_raw.setText(tr('response.raw'))
+        self.radio_json.setText(tr('response.json'))
+        self.radio_tree.setText(tr('response.json_tree'))
+        self.save_raw_btn.setText(tr('response.save_raw'))
+        self.text_edit.setPlaceholderText(tr('response.placeholder'))
+        self.json_tree.setHeaderLabels([tr('response.key'), tr('response.value')])
 
     def _has_body(self) -> bool:
         """Whether there is response content to save."""
@@ -327,21 +336,18 @@ class ResponseBodyPanel(QWidget):
     def _json_format_limit_tip(self) -> str:
         limit_bytes = get_app_config().json_format_max_bytes
         if limit_bytes % (1024 * 1024) == 0:
-            limit_label = f'{limit_bytes // (1024 * 1024)} MB'
+            limit_label = f'{limit_bytes // (1024 * 1024)} {tr("response.mb_unit")}'
         elif limit_bytes % 1024 == 0:
-            limit_label = f'{limit_bytes // 1024} KB'
+            limit_label = f'{limit_bytes // 1024} {tr("response.kb_unit")}'
         else:
-            limit_label = f'{limit_bytes} bytes'
-        return (
-            f'Response body exceeds {limit_label}; '
-            'JSON formatting and tree view are unavailable.'
-        )
+            limit_label = f'{limit_bytes} {tr("response.bytes_unit")}'
+        return tr('response.json_limit_tip', limit=limit_label)
 
     def _is_body_json(self) -> bool:
         return _looks_like_json(self._raw_body)
 
     def _notify_json_format_limit(self) -> None:
-        show_system_tip('HTTP Requester', self._json_format_limit_tip(), widget=self)
+        show_system_tip(tr('main.window_title'), self._json_format_limit_tip(), widget=self)
 
     def _revert_to_raw_view(self) -> None:
         self.view_group.blockSignals(True)
@@ -350,7 +356,7 @@ class ResponseBodyPanel(QWidget):
 
     def _raw_display_text(self) -> str:
         if self._is_binary_non_image:
-            header = self._raw_body.strip() or f'[Binary data, {len(self._raw_bytes)} bytes]'
+            header = self._raw_body.strip() or tr('response.binary_data', count=len(self._raw_bytes))
             return f'{header}\n\n{format_hex_preview(self._raw_bytes)}'
         return self._raw_body
 
@@ -445,7 +451,7 @@ class ResponseBodyPanel(QWidget):
         try:
             parsed = json.loads(self._raw_body)
         except (json.JSONDecodeError, TypeError):
-            error_item = QTreeWidgetItem(self.json_tree, ['(error)', 'Invalid JSON'])
+            error_item = QTreeWidgetItem(self.json_tree, [tr('response.tree_invalid_json'), tr('response.tree_invalid_json_value')])
             error_item.setData(0, Qt.UserRole, 'error')
             return
         _populate_json_tree(self.json_tree, parsed)
@@ -472,15 +478,15 @@ class ResponseBodyPanel(QWidget):
         if item is None:
             return
         menu = QMenu(self)
-        expand_action = menu.addAction('Expand')
-        expand_all_action = menu.addAction('Expand all children')
-        collapse_action = menu.addAction('Collapse')
-        collapse_all_action = menu.addAction('Collapse all children')
+        expand_action = menu.addAction(tr('response.tree_expand'))
+        expand_all_action = menu.addAction(tr('response.tree_expand_all'))
+        collapse_action = menu.addAction(tr('response.tree_collapse'))
+        collapse_all_action = menu.addAction(tr('response.tree_collapse_all'))
         menu.addSeparator()
-        copy_key_action = menu.addAction('Copy Key')
-        copy_val_action = menu.addAction('Copy Value')
-        copy_kv_action = menu.addAction('Copy Key: Value')
-        copy_json_action = menu.addAction('Copy {Key: Value}')
+        copy_key_action = menu.addAction(tr('response.tree_copy_key'))
+        copy_val_action = menu.addAction(tr('response.tree_copy_value'))
+        copy_kv_action = menu.addAction(tr('response.tree_copy_kv'))
+        copy_json_action = menu.addAction(tr('response.tree_copy_json'))
         action = menu.exec_(self.json_tree.viewport().mapToGlobal(pos))
         if action == expand_action:
             item.setExpanded(True)
@@ -610,11 +616,11 @@ class ResponseBodyPanel(QWidget):
         else:
             return
         default_name = f'response{_guess_file_extension(self._headers)}'
-        path, _ = QFileDialog.getSaveFileName(self, 'Save Response Body', default_name)
+        path, _ = get_save_file_name(self, tr('response.save_title'), default_name)
         if not path:
             return
         try:
             with open(path, 'wb') as f:
                 f.write(data)
         except OSError as e:
-            QMessageBox.warning(self, 'Save Error', f'Failed to save file:\n{e}')
+            message_warning(self, tr('response.save_error_title'), tr('response.save_error_body', error=str(e)))

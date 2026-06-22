@@ -19,6 +19,12 @@ from PyQt5.QtWidgets import (
     QStyledItemDelegate,
 )
 
+from typing import Callable, Optional, Type
+
+from PyQt5.QtGui import QContextMenuEvent, QKeySequence
+from PyQt5.QtWidgets import QLineEdit, QPlainTextEdit, QTextEdit
+
+from i18n import tr
 from ui.theme import check_mark_color, popup_list_font
 
 ARROW_GLYPH_BASE_PX = 8
@@ -233,3 +239,120 @@ class AccentCheckBox(QCheckBox):
             _paint_check_mark(painter, indicator)
         finally:
             painter.end()
+
+
+_EDIT_MENU_LABELS = {
+    'Undo': 'edit.undo',
+    'Redo': 'edit.redo',
+    'Cut': 'edit.cut',
+    'Copy': 'edit.copy',
+    'Paste': 'edit.paste',
+    'Delete': 'edit.delete',
+    'Select All': 'edit.select_all',
+    # Qt qt_zh_CN.qm defaults (used when matching by visible label).
+    '撤消': 'edit.undo',
+    '撤销': 'edit.undo',
+    '恢复': 'edit.redo',
+    '重做': 'edit.redo',
+    '剪切': 'edit.cut',
+    '复制': 'edit.copy',
+    '粘贴': 'edit.paste',
+    '删除': 'edit.delete',
+    '全选': 'edit.select_all',
+    '选择全部': 'edit.select_all',
+}
+
+_EDIT_MENU_SHORTCUTS = {
+    'Ctrl+Z': 'edit.undo',
+    'Ctrl+Y': 'edit.redo',
+    'Ctrl+X': 'edit.cut',
+    'Ctrl+C': 'edit.copy',
+    'Ctrl+V': 'edit.paste',
+    'Ctrl+A': 'edit.select_all',
+}
+
+
+def _standard_edit_action_label(text: str) -> str:
+    """Strip mnemonic (&), shortcut tab suffix, and (U) style hints."""
+    if not text:
+        return ''
+    label = text.split('\t', 1)[0].replace('&', '')
+    if '(' in label:
+        label = label.split('(', 1)[0]
+    return label.strip()
+
+
+def _standard_edit_action_shortcut(text: str, action) -> str:
+    if '\t' in text:
+        return text.split('\t', 1)[1].strip()
+    shortcut = action.shortcut()
+    return shortcut.toString() if not shortcut.isEmpty() else ''
+
+
+def _edit_menu_i18n_key(action) -> Optional[str]:
+    text = action.text()
+    label = _standard_edit_action_label(text)
+    key = _EDIT_MENU_LABELS.get(label)
+    if key is not None:
+        return key
+    shortcut_text = _standard_edit_action_shortcut(text, action)
+    if shortcut_text:
+        key = _EDIT_MENU_SHORTCUTS.get(shortcut_text)
+        if key is not None:
+            return key
+    shortcut = action.shortcut()
+    if shortcut.isEmpty():
+        return None
+    for std_key, i18n_key in (
+        (QKeySequence.Undo, 'edit.undo'),
+        (QKeySequence.Redo, 'edit.redo'),
+        (QKeySequence.Cut, 'edit.cut'),
+        (QKeySequence.Copy, 'edit.copy'),
+        (QKeySequence.Paste, 'edit.paste'),
+        (QKeySequence.Delete, 'edit.delete'),
+        (QKeySequence.SelectAll, 'edit.select_all'),
+    ):
+        if shortcut.matches(QKeySequence(std_key)):
+            return i18n_key
+    return None
+
+
+def _translate_standard_edit_menu(menu) -> None:
+    for action in menu.actions():
+        if action.isSeparator() or not action.text():
+            continue
+        key = _edit_menu_i18n_key(action)
+        if key is None:
+            continue
+        text = action.text()
+        shortcut_suffix = _standard_edit_action_shortcut(text, action)
+        translated = tr(key)
+        action.setText(f'{translated}\t{shortcut_suffix}' if shortcut_suffix else translated)
+
+
+def _wrap_context_menu_event(original: Callable) -> Callable:
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        menu = self.createStandardContextMenu()
+        if menu is not None:
+            _translate_standard_edit_menu(menu)
+            menu.exec_(event.globalPos())
+            menu.deleteLater()
+        else:
+            original(self, event)
+
+    return contextMenuEvent
+
+
+_EDIT_CONTEXT_MENU_CLASSES: tuple[Type, ...] = (QLineEdit, QPlainTextEdit, QTextEdit)
+_INSTALLED = False
+
+
+def install_edit_context_menu_translations(app=None) -> None:
+    """Patch standard text widgets so their built-in context menus use tr()."""
+    del app  # kept for call-site compatibility
+    global _INSTALLED
+    if _INSTALLED:
+        return
+    _INSTALLED = True
+    for widget_cls in _EDIT_CONTEXT_MENU_CLASSES:
+        widget_cls.contextMenuEvent = _wrap_context_menu_event(widget_cls.contextMenuEvent)

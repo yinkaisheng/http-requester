@@ -11,5 +11,6 @@ CONFIG_FILE = DATA_DIR / 'config.json'
 HISTORY_FILE = DATA_DIR / 'history.json'
 RECORDS_DIR = DATA_DIR / 'records'
 SESSION_FILE = DATA_DIR / 'session.json'
+LANGUAGES_DIR = APP_DIR / 'Languages'
 
 STORAGE_VERSION = 1

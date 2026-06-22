@@ -15,7 +15,6 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QLineEdit,
     QMenu,
-    QMessageBox,
     QPushButton,
     QSizePolicy,
     QStackedWidget,
@@ -29,6 +28,8 @@ from PyQt5.QtWidgets import (
 from models.http_models import HeaderItem, HttpRequest, is_valid_header_name
 from services.curl_import import parse_curl_command
 from services.powershell_import import parse_powershell_command
+from i18n import tr
+from ui.dialog_i18n import message_info
 from ui.dialogs import prompt_basic_auth, prompt_bearer_token
 from ui.theme import check_mark_color, table_font_size_px
 
@@ -42,15 +43,13 @@ HEADER_TABLE_EDITABLE_MIN_HEIGHT = 24
 TOGGLE_CELL_MARGIN_V = 1
 HEADER_TABLE_TOGGLE_SIZE = 16
 
-COPY_CURL_MENU_TEXT = 'Copy as Curl Command'
-COPY_POWERSHELL_MENU_TEXT = 'Copy as PowerShell Command'
-COPY_SELECTED_HEADERS_MENU_TEXT = 'Copy Selected Headers (Ctrl+C)'
-PASTE_HEADERS_MENU_TEXT = 'Paste Headers (Ctrl+V)'
-PASTE_CURL_MENU_TEXT = 'Paste from Curl Command'
-PASTE_POWERSHELL_MENU_TEXT = 'Paste from PowerShell Command'
-DELETE_SELECTED_HEADERS_MENU_TEXT = 'Delete Selected Headers'
-BASIC_AUTH_MENU_TEXT = 'Basic Auth...'
-BEARER_TOKEN_MENU_TEXT = 'Bearer Token...'
+
+def header_table_labels() -> List[str]:
+    return [tr('headers.header'), tr('headers.value')]
+
+
+def raw_header_table_labels() -> List[str]:
+    return [tr('headers.enable'), tr('headers.header'), tr('headers.value')]
 
 
 def configure_section_header_layout(layout: QHBoxLayout) -> None:
@@ -182,7 +181,7 @@ def _copy_to_clipboard(text: str) -> None:
 
 
 def _show_paste_error(parent: QWidget, message: str) -> None:
-    QMessageBox.information(parent, 'Paste failed', message)
+    message_info(parent, tr('menu.paste_failed_title'), message)
 
 
 class HeaderTableInteraction(QObject):
@@ -343,39 +342,39 @@ class HeaderTableInteraction(QObject):
             return
         menu = QMenu(table)
 
-        copy_action = menu.addAction(COPY_SELECTED_HEADERS_MENU_TEXT)
+        copy_action = menu.addAction(tr('menu.copy_selected_headers'))
         copy_action.setEnabled(bool(selected_rows))
-        copy_all_action = menu.addAction('Copy All Headers')
+        copy_all_action = menu.addAction(tr('menu.copy_all_headers'))
         delete_action = None
         if self._delete_rows_callback is not None:
-            delete_action = menu.addAction(DELETE_SELECTED_HEADERS_MENU_TEXT)
+            delete_action = menu.addAction(tr('menu.delete_selected_headers'))
             delete_action.setEnabled(bool(selected_rows))
         basic_auth_action = None
         bearer_auth_action = None
         if self._basic_auth_callback is not None or self._bearer_auth_callback is not None:
             menu.addSeparator()
         if self._basic_auth_callback is not None:
-            basic_auth_action = menu.addAction(BASIC_AUTH_MENU_TEXT)
+            basic_auth_action = menu.addAction(tr('menu.basic_auth'))
         if self._bearer_auth_callback is not None:
-            bearer_auth_action = menu.addAction(BEARER_TOKEN_MENU_TEXT)
+            bearer_auth_action = menu.addAction(tr('menu.bearer_token'))
         paste_action = None
         paste_curl_action = None
         paste_powershell_action = None
         if self._paste_callback is not None or self._paste_request_callback is not None:
             menu.addSeparator()
         if self._paste_callback is not None:
-            paste_action = menu.addAction(PASTE_HEADERS_MENU_TEXT)
+            paste_action = menu.addAction(tr('menu.paste_headers'))
         if self._paste_request_callback is not None:
-            paste_curl_action = menu.addAction(PASTE_CURL_MENU_TEXT)
-            paste_powershell_action = menu.addAction(PASTE_POWERSHELL_MENU_TEXT)
+            paste_curl_action = menu.addAction(tr('menu.paste_curl'))
+            paste_powershell_action = menu.addAction(tr('menu.paste_powershell'))
         curl_action = None
         powershell_action = None
         if self._curl_callback is not None or self._powershell_callback is not None:
             menu.addSeparator()
         if self._curl_callback is not None:
-            curl_action = menu.addAction(COPY_CURL_MENU_TEXT)
+            curl_action = menu.addAction(tr('menu.copy_curl'))
         if self._powershell_callback is not None:
-            powershell_action = menu.addAction(COPY_POWERSHELL_MENU_TEXT)
+            powershell_action = menu.addAction(tr('menu.copy_powershell'))
 
         action = menu.exec_(table.viewport().mapToGlobal(pos))
         if action is None:
@@ -401,13 +400,13 @@ class HeaderTableInteraction(QObject):
             if req is not None:
                 self._paste_request_callback(req)
             else:
-                _show_paste_error(table, 'Could not parse a curl command from the clipboard.')
+                _show_paste_error(table, tr('menu.paste_curl_error'))
         elif paste_powershell_action is not None and action == paste_powershell_action:
             req = parse_powershell_command(QApplication.clipboard().text())
             if req is not None:
                 self._paste_request_callback(req)
             else:
-                _show_paste_error(table, 'Could not parse a PowerShell command from the clipboard.')
+                _show_paste_error(table, tr('menu.paste_powershell_error'))
         elif curl_action is not None and action == curl_action:
             self._curl_callback()
         elif powershell_action is not None and action == powershell_action:
@@ -541,7 +540,7 @@ class RawHeadersEditor(QWidget):
 
         self.table = QTableWidget(0, 3)
         self.table.setObjectName('headerTable')
-        self.table.setHorizontalHeaderLabels(['Enable', 'Header', 'Value'])
+        self.table.setHorizontalHeaderLabels(raw_header_table_labels())
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
@@ -565,8 +564,8 @@ class RawHeadersEditor(QWidget):
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 2, 0, 0)
         btn_layout.setSpacing(6)
-        self.add_btn = _compact_action_button('+ Add')
-        self.remove_btn = _compact_action_button('- Remove')
+        self.add_btn = _compact_action_button(tr('headers.add'))
+        self.remove_btn = _compact_action_button(tr('headers.remove'))
         self.add_btn.clicked.connect(self._add_row)
         self.remove_btn.clicked.connect(self._remove_selected_rows)
         btn_layout.addWidget(self.add_btn)
@@ -576,6 +575,11 @@ class RawHeadersEditor(QWidget):
         layout.addLayout(btn_layout, 0)
 
         self._add_row()
+
+    def retranslate_ui(self) -> None:
+        self.table.setHorizontalHeaderLabels(raw_header_table_labels())
+        self.add_btn.setText(tr('headers.add'))
+        self.remove_btn.setText(tr('headers.remove'))
 
     def _add_row(self, item: Optional[HeaderItem] = None) -> None:
         row = self.table.rowCount()
@@ -704,7 +708,7 @@ class SentHeadersView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self.table = QTableWidget(0, 2)
         self.table.setObjectName('headerTable')
-        self.table.setHorizontalHeaderLabels(['Header', 'Value'])
+        self.table.setHorizontalHeaderLabels(header_table_labels())
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
@@ -721,6 +725,9 @@ class SentHeadersView(QWidget):
 
     def set_headers(self, headers: Dict[str, str]) -> None:
         fill_key_value_table(self.table, headers)
+
+    def retranslate_ui(self) -> None:
+        self.table.setHorizontalHeaderLabels(header_table_labels())
 
 
 class RequestHeadersPanel(QWidget):
@@ -749,8 +756,8 @@ class RequestHeadersPanel(QWidget):
         configure_section_header_layout(header_layout)
 
         self.mode_group = QButtonGroup(self)
-        self.raw_btn = QPushButton('Request Headers User')
-        self.sent_btn = QPushButton('Request Headers Sent')
+        self.raw_btn = QPushButton(tr('headers.request_user'))
+        self.sent_btn = QPushButton(tr('headers.request_sent'))
         for btn in (self.raw_btn, self.sent_btn):
             btn.setObjectName('headerModeButton')
             btn.setCheckable(True)
@@ -779,6 +786,12 @@ class RequestHeadersPanel(QWidget):
         self.stack.addWidget(self.raw_editor)
         self.stack.addWidget(self.sent_view)
         layout.addWidget(self.stack, 1)
+
+    def retranslate_ui(self) -> None:
+        self.raw_btn.setText(tr('headers.request_user'))
+        self.sent_btn.setText(tr('headers.request_sent'))
+        self.raw_editor.retranslate_ui()
+        self.sent_view.retranslate_ui()
 
     def _switch_mode(self, mode: str) -> None:
         if mode == 'sent':

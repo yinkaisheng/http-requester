@@ -23,11 +23,12 @@ from pyqt_async_task import AsyncTask
 from storage.history_store import HistoryStore
 from models.http_models import HistoryRecord
 from storage.session_store import SessionStore
-from storage.app_config import get_app_config, save_appearance_settings
+from storage.app_config import get_app_config, save_app_preferences
 from ui.dialogs import AppSettings, prompt_app_settings, show_about_dialog
 from ui.history_panel import HistoryPanel
 from ui.request_tab import RequestTab, splitter_ratio_to_sizes, splitter_sizes_to_ratio, MSG_HTTP_DONE
 from ui.request_tab_widget import RequestTabWidget
+from i18n import register_retranslator, set_language, tr
 from ui.theme import (
     apply_app_theme,
     normalize_body_text_font_family,
@@ -52,9 +53,10 @@ class MainWindow(QMainWindow):
         self._session_save_timer.setSingleShot(True)
         self._session_save_timer.setInterval(500)
         self._session_save_timer.timeout.connect(self._save_session)
-        self.setWindowTitle('HTTP Requester')
+        self.setWindowTitle(tr('main.window_title'))
         self._main_splitter: Optional[QSplitter] = None
         self._init_ui()
+        register_retranslator(self.retranslate_ui)
         self._connect_signals()
         self._restore_session()
 
@@ -68,7 +70,7 @@ class MainWindow(QMainWindow):
         top_layout = QHBoxLayout(top_bar)
         top_layout.setContentsMargins(8, 4, 8, 4)
         top_layout.setAlignment(Qt.AlignVCenter)
-        self.new_btn = QPushButton('+ New Request')
+        self.new_btn = QPushButton(tr('main.new_request'))
         self.new_btn.setObjectName('primaryButton')
         self.new_btn.clicked.connect(self._on_new_request)
         top_layout.addWidget(self.new_btn, 0, Qt.AlignVCenter)
@@ -76,14 +78,14 @@ class MainWindow(QMainWindow):
         self.settings_btn = QToolButton()
         self.settings_btn.setObjectName('settingsButton')
         self.settings_btn.setText('\u2699')
-        self.settings_btn.setToolTip('Settings')
+        self.settings_btn.setToolTip(tr('main.settings_tooltip'))
         self.settings_btn.clicked.connect(self._on_settings_clicked)
         top_layout.addWidget(self.settings_btn, 0, Qt.AlignVCenter)
 
         self.about_btn = QToolButton()
         self.about_btn.setObjectName('aboutButton')
         self.about_btn.setText('\u24D8')
-        self.about_btn.setToolTip('About')
+        self.about_btn.setToolTip(tr('main.about_tooltip'))
         self.about_btn.clicked.connect(self._on_about_clicked)
         top_layout.addWidget(self.about_btn, 0, Qt.AlignVCenter)
         top_layout.addStretch()
@@ -210,6 +212,14 @@ class MainWindow(QMainWindow):
         self._save_session()
         super().closeEvent(event)
 
+    def retranslate_ui(self) -> None:
+        self.setWindowTitle(tr('main.window_title'))
+        self.new_btn.setText(tr('main.new_request'))
+        self.settings_btn.setToolTip(tr('main.settings_tooltip'))
+        self.about_btn.setToolTip(tr('main.about_tooltip'))
+        self.history_panel.retranslate_ui()
+        self.request_tabs.retranslate_ui()
+
     def _on_new_request(self) -> None:
         self.request_tabs.new_request()
 
@@ -229,11 +239,16 @@ class MainWindow(QMainWindow):
         )
 
     def _save_settings(self, settings: AppSettings) -> None:
-        save_appearance_settings(
+        save_app_preferences(
             theme=settings.theme,
             body_text_font_family=settings.family,
             body_text_font_size_px=settings.size,
+            language=settings.language,
         )
+        set_language(settings.language)
+        # app = QApplication.instance()
+        # if app is not None:
+        #     sync_qt_translator(app, settings.language)  # Qt .qm; see i18n/qt_locale.py
         self._apply_appearance()
 
     def _on_settings_clicked(self) -> None:
@@ -243,6 +258,7 @@ class MainWindow(QMainWindow):
             self._current_theme(),
             appearance.body_text_font_size_px,
             appearance.body_text_font_family,
+            get_app_config().language,
             on_save=self._save_settings,
         )
 

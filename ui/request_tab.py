@@ -44,8 +44,6 @@ from storage.history_store import HistoryStore
 from ui.body_editor import BodyEditor
 from ui.response_body_panel import ResponseBodyPanel
 from ui.headers_editor import (
-    COPY_CURL_MENU_TEXT,
-    COPY_POWERSHELL_MENU_TEXT,
     RequestHeadersPanel,
     _set_compact_table_header,
     add_section_header_widget,
@@ -53,7 +51,10 @@ from ui.headers_editor import (
     attach_header_table_menu,
     configure_section_header_layout,
     fill_key_value_table,
+    header_table_labels,
 )
+from i18n import tr
+from ui.dialog_i18n import ask_yes_no_cancel, message_warning
 from ui.widgets import AccentCheckBox, ArrowComboBox, GlyphSpinBox
 
 MSG_HTTP_DONE = 1
@@ -148,32 +149,33 @@ class RequestTab(QWidget):
         toolbar.setAlignment(Qt.AlignVCenter)
         self.method_combo = ArrowComboBox()
         self.method_combo.addItems(HTTP_METHODS)
-        self.ssl_verify_check = AccentCheckBox('SSL Verify')
+        self.ssl_verify_check = AccentCheckBox(tr('request.ssl_verify'))
         self.ssl_verify_check.setChecked(True)
         self.url_edit = QLineEdit()
-        self.url_edit.setPlaceholderText('https://api.example.com/path')
+        self.url_edit.setPlaceholderText(tr('request.url_placeholder'))
         timeout_row = QWidget()
         timeout_layout = QHBoxLayout(timeout_row)
         timeout_layout.setContentsMargins(0, 0, 0, 0)
         timeout_layout.setSpacing(4)
-        timeout_label = QLabel('Timeout')
+        timeout_label = QLabel(tr('request.timeout'))
         timeout_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        self._timeout_label = timeout_label
         self.timeout_spin = GlyphSpinBox()
         self.timeout_spin.setRange(1, 3600)
         self.timeout_spin.setValue(DEFAULT_REQUEST_TIMEOUT_SECONDS)
-        self.timeout_spin.setSuffix('s')
+        self.timeout_spin.setSuffix(tr('request.timeout_suffix'))
         self.timeout_spin.setFixedWidth(72)
         timeout_layout.addWidget(timeout_label)
         timeout_layout.addWidget(self.timeout_spin)
-        self.send_btn = QPushButton('Send')
+        self.send_btn = QPushButton(tr('request.send'))
         self.send_btn.setObjectName('primaryButton')
         self.send_btn.setFixedWidth(80)
         self.send_btn.clicked.connect(self._on_send_clicked)
-        self.curl_btn = QPushButton('curl')
-        self.curl_btn.setToolTip(COPY_CURL_MENU_TEXT)
+        self.curl_btn = QPushButton(tr('request.curl_btn'))
+        self.curl_btn.setToolTip(tr('menu.copy_curl'))
         self.curl_btn.clicked.connect(self._copy_request_as_curl)
-        self.pwsh_btn = QPushButton('pwsh')
-        self.pwsh_btn.setToolTip(COPY_POWERSHELL_MENU_TEXT)
+        self.pwsh_btn = QPushButton(tr('request.powershell_btn'))
+        self.pwsh_btn.setToolTip(tr('menu.copy_powershell'))
         self.pwsh_btn.clicked.connect(self._copy_request_as_powershell)
         toolbar.addWidget(self.method_combo, 0, Qt.AlignVCenter)
         toolbar.addWidget(self.ssl_verify_check, 0, Qt.AlignVCenter)
@@ -203,7 +205,7 @@ class RequestTab(QWidget):
         self.right_splitter = QSplitter(Qt.Vertical)
         self.response_headers_table = QTableWidget(0, 2)
         self.response_headers_table.setObjectName('headerTable')
-        self.response_headers_table.setHorizontalHeaderLabels(['Header', 'Value'])
+        self.response_headers_table.setHorizontalHeaderLabels(header_table_labels())
         self.response_headers_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.response_headers_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.response_headers_table.verticalHeader().setVisible(False)
@@ -220,14 +222,14 @@ class RequestTab(QWidget):
         rh_header_row = QWidget()
         rh_header = QHBoxLayout(rh_header_row)
         configure_section_header_layout(rh_header)
-        rh_title = QLabel('Response Headers')
-        rh_title.setObjectName('sectionTitle')
-        rh_title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self._rh_title = QLabel(tr('request.response_headers'))
+        self._rh_title.setObjectName('sectionTitle')
+        self._rh_title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.status_label = QLabel()
         self.status_label.setObjectName('statusPending')
         self.status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._set_status_text('Waiting to send request')
-        add_section_header_widget(rh_header, rh_title)
+        self._set_status_text(tr('request.waiting'))
+        add_section_header_widget(rh_header, self._rh_title)
         rh_header.addStretch()
         add_section_header_widget(rh_header, self.status_label)
         apply_section_header_row_height(rh_header_row)
@@ -246,6 +248,20 @@ class RequestTab(QWidget):
         for splitter in (self.content_splitter, self.left_splitter, self.right_splitter):
             splitter.splitterMoved.connect(self._on_splitter_moved)
         layout.addWidget(self.content_splitter, 1)
+
+    def retranslate_ui(self) -> None:
+        self.ssl_verify_check.setText(tr('request.ssl_verify'))
+        self._timeout_label.setText(tr('request.timeout'))
+        self.send_btn.setText(tr('request.send'))
+        self.curl_btn.setToolTip(tr('menu.copy_curl'))
+        self.pwsh_btn.setToolTip(tr('menu.copy_powershell'))
+        self._rh_title.setText(tr('request.response_headers'))
+        self.response_headers_table.setHorizontalHeaderLabels(header_table_labels())
+        self.headers_panel.retranslate_ui()
+        self.body_editor.retranslate_ui()
+        self.response_body_panel.retranslate_ui()
+        if self.status_label.objectName() == 'statusPending' and self._active_task_id is None:
+            self._set_status_text(tr('request.waiting'))
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
@@ -328,7 +344,7 @@ class RequestTab(QWidget):
         url = url_without_query(self.url_edit.text().strip())
         if url:
             return url
-        return 'New Request'
+        return tr('request.new_request')
 
     def apply_record_name(self, name: str) -> None:
         if self._record is not None:
@@ -496,19 +512,17 @@ class RequestTab(QWidget):
         if req.body_type == BodyType.JSON and req.body_text.strip():
             json_error = validate_json_body_text(req.body_text)
             if json_error:
-                QMessageBox.warning(
+                message_warning(
                     self,
-                    'Invalid JSON',
-                    f'Request body is not valid JSON:\n{json_error}',
+                    tr('request.invalid_json_title'),
+                    tr('request.invalid_json_body', error=json_error),
                 )
                 return
         if req.method.upper() == 'GET' and req.has_body():
-            reply = QMessageBox.question(
+            reply = ask_yes_no_cancel(
                 self,
-                'Confirm GET with body',
-                'Send a non-empty request body using GET?',
-                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
-                QMessageBox.Cancel,
+                tr('request.confirm_get_title'),
+                tr('request.confirm_get_body'),
             )
             if reply == QMessageBox.Cancel:
                 return
@@ -521,7 +535,7 @@ class RequestTab(QWidget):
 
     def _execute_send(self, req: HttpRequest) -> None:
         self.send_btn.setEnabled(False)
-        self._set_status_text('Sending...')
+        self._set_status_text(tr('request.sending'))
         self._set_status_style('statusPending')
         try:
             self._active_task_id = self.async_task.runTaskInThread(
@@ -530,7 +544,7 @@ class RequestTab(QWidget):
         except Exception:
             self._active_task_id = None
             self.send_btn.setEnabled(True)
-            self._set_status_text('Error: Failed to start request')
+            self._set_status_text(tr('request.error_start'))
             self._set_status_style('statusError')
 
     def _on_http_result(self, task_id: int, msg_id: int, data: Any) -> None:
@@ -554,7 +568,7 @@ class RequestTab(QWidget):
 
     def _show_response(self, resp: HttpResponse) -> None:
         if resp.error and not resp.status_code:
-            self._set_status_text(f'Error: {resp.error}')
+            self._set_status_text(tr('request.error_prefix', message=resp.error))
             self._set_status_style('statusError')
             self.response_headers_table.setRowCount(0)
             self.response_body_panel.clear()
@@ -563,11 +577,17 @@ class RequestTab(QWidget):
 
         if resp.error:
             self._set_status_text(
-                f'Error: {resp.error} · {resp.status_code} {resp.reason} · {resp.elapsed_ms:.0f} ms'
+                tr(
+                    'request.status_error',
+                    error=resp.error,
+                    status_code=resp.status_code,
+                    reason=resp.reason,
+                    elapsed_ms=f'{resp.elapsed_ms:.0f}',
+                )
             )
         else:
             self._set_status_text(
-                f'{resp.status_code} {resp.reason} · {resp.elapsed_ms:.0f} ms'
+                f'{resp.status_code} {resp.reason} · {resp.elapsed_ms:.0f} {tr("request.ms_unit")}'
             )
         self._set_status_style(_status_code_style_id(resp.status_code))
 
@@ -583,7 +603,7 @@ class RequestTab(QWidget):
             self._cached_response = _response_snapshot(resp)
 
     def _clear_response_display(self) -> None:
-        self._set_status_text('Waiting to send request')
+        self._set_status_text(tr('request.waiting'))
         self._set_status_style('statusPending')
         self.response_headers_table.setRowCount(0)
         self.response_body_panel.clear()
@@ -606,13 +626,13 @@ class RequestTab(QWidget):
         if status_code is not None:
             style_id = _status_code_style_id(status_code)
             if elapsed_ms is not None:
-                status_text = f'{status_code} {reason} · {elapsed_ms:.0f} ms'.strip()
+                status_text = f'{status_code} {reason} · {elapsed_ms:.0f} {tr("request.ms_unit")}'.strip()
             else:
                 status_text = f'{status_code} {reason}'.strip()
             self._set_status_text(status_text)
             self._set_status_style(style_id)
         else:
-            self._set_status_text('Saved response')
+            self._set_status_text(tr('request.saved_response'))
             self._set_status_style('statusPending')
 
         fill_key_value_table(self.response_headers_table, headers)

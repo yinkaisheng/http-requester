@@ -15,9 +15,15 @@ script_path = Path(__file__).resolve()
 if 'python' not in exe_path.name.lower():
     os.chdir(exe_path.parent) # sys.executable is HttpRequester.exe(Windows) or httpreq(Linux)
 else:
-    os.chdir(script_path.parent)
+    os.chdir(script_path.parent) # main.py dir
 
+# UI translations: Languages/<locale>/ (see i18n/translator.py for common locale folder names)
 from storage.app_config import get_app_config, init_app_config
+from i18n import init_i18n
+# Qt .qm translator (standard Qt approach; not used — see i18n/qt_locale.py):
+# from i18n.qt_locale import sync_qt_translator
+from ui.dialog_i18n import install_dialog_translations
+from ui.widgets import install_edit_context_menu_translations
 from ui.main_window import MainWindow
 from ui.theme import (
     apply_app_font,
@@ -39,7 +45,12 @@ def run_qt_app():
     init_app_config()
     app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create('Fusion'))
-    app.setApplicationName('HTTP Requester')
+    install_edit_context_menu_translations(app)
+    install_dialog_translations(app)
+    init_i18n(get_app_config().language)
+    # sync_qt_translator(app, get_app_config().language)  # Qt .qm; see i18n/qt_locale.py
+    from i18n import tr
+    app.setApplicationName(tr('main.window_title'))
     icon = _load_app_icon()
     if not icon.isNull():
         app.setWindowIcon(icon)

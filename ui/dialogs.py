@@ -17,13 +17,14 @@ from PyQt5.QtWidgets import (
 )
 
 from app_info import APP_NAME, APP_VERSION, GITHUB_URL
+from i18n import get_language, list_languages, tr
 from storage.app_config import get_app_config
 
+from ui.dialog_i18n import translate_button_box
 from ui.widgets import ArrowComboBox, GlyphSpinBox
 from ui.theme import (
     body_text_font_size_max,
     body_text_font_size_min,
-    THEME_LABELS,
     THEME_OPTIONS,
     ThemeName,
     format_link_html,
@@ -37,6 +38,7 @@ class AppSettings:
     theme: ThemeName
     size: int
     family: str
+    language: str
 
 
 def _create_dialog(parent: QWidget, title: str, *, min_width: int = 400) -> QDialog:
@@ -61,6 +63,23 @@ def _add_form_field(grid: QGridLayout, row: int, label_text: str, field: QWidget
     grid.addWidget(field, row, 1)
 
 
+def _select_combo_by_data(combo: ArrowComboBox, value: str) -> None:
+    for index in range(combo.count()):
+        if combo.itemData(index) == value:
+            combo.setCurrentIndex(index)
+            return
+    combo.setCurrentIndex(0)
+
+
+def _select_body_font_family(combo: ArrowComboBox, family: str) -> None:
+    target = normalize_body_text_font_family(family)
+    index = combo.findText(target)
+    if index >= 0:
+        combo.setCurrentIndex(index)
+        return
+    combo.setCurrentIndex(0)
+
+
 def prompt_text(
     parent: QWidget,
     title: str,
@@ -79,6 +98,7 @@ def prompt_text(
     _add_form_field(grid, 0, label, edit)
 
     buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=dialog)
+    translate_button_box(buttons)
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
     layout.addLayout(grid)
@@ -100,7 +120,7 @@ def prompt_basic_auth(
     *,
     min_width: int = 400,
 ) -> Optional[Tuple[str, str]]:
-    dialog = _create_dialog(parent, 'Basic Auth', min_width=min_width)
+    dialog = _create_dialog(parent, tr('auth.basic_title'), min_width=min_width)
 
     layout = QVBoxLayout(dialog)
     grid = _create_form_grid()
@@ -109,10 +129,11 @@ def prompt_basic_auth(
     password_edit = QLineEdit()
     password_edit.setEchoMode(QLineEdit.Password)
     password_edit.setMinimumWidth(min_width - 48)
-    _add_form_field(grid, 0, 'Username', username_edit)
-    _add_form_field(grid, 1, 'Password', password_edit)
+    _add_form_field(grid, 0, tr('auth.username'), username_edit)
+    _add_form_field(grid, 1, tr('auth.password'), password_edit)
 
     buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=dialog)
+    translate_button_box(buttons)
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
     layout.addLayout(grid)
@@ -130,15 +151,16 @@ def prompt_bearer_token(
     *,
     min_width: int = 400,
 ) -> Optional[str]:
-    dialog = _create_dialog(parent, 'Bearer Token', min_width=min_width)
+    dialog = _create_dialog(parent, tr('auth.bearer_title'), min_width=min_width)
 
     layout = QVBoxLayout(dialog)
     grid = _create_form_grid()
     token_edit = QLineEdit()
     token_edit.setMinimumWidth(min_width - 48)
-    _add_form_field(grid, 0, 'Token', token_edit)
+    _add_form_field(grid, 0, tr('auth.token'), token_edit)
 
     buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=dialog)
+    translate_button_box(buttons)
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
     layout.addLayout(grid)
@@ -154,29 +176,22 @@ def prompt_bearer_token(
     return token
 
 
-def _select_body_font_family(combo: ArrowComboBox, family: str) -> None:
-    target = normalize_body_text_font_family(family)
-    index = combo.findText(target)
-    if index >= 0:
-        combo.setCurrentIndex(index)
-        return
-    combo.setCurrentIndex(0)
-
-
 def prompt_app_settings(
     parent: QWidget,
     current_theme: str,
     current_size: int,
     current_family: str,
+    current_language: str,
     *,
     on_save: Optional[Callable[[AppSettings], None]] = None,
     min_width: int = 400,
 ) -> Optional[AppSettings]:
-    dialog = _create_dialog(parent, 'Settings', min_width=min_width)
+    dialog = _create_dialog(parent, tr('settings.title'), min_width=min_width)
     initial = AppSettings(
         theme=normalize_theme_name(current_theme),
         size=current_size,
         family=normalize_body_text_font_family(current_family),
+        language=current_language or get_language(),
     )
     last_saved = initial
 
@@ -185,34 +200,43 @@ def prompt_app_settings(
     theme_combo = ArrowComboBox()
     theme_combo.setMinimumWidth(min_width - 48)
     for theme_name in THEME_OPTIONS:
-        theme_combo.addItem(THEME_LABELS[theme_name], theme_name)
+        theme_combo.addItem(tr(f'theme.{theme_name}'), theme_name)
     theme_combo.setCurrentIndex(THEME_OPTIONS.index(initial.theme))
-    _add_form_field(grid, 0, 'Theme', theme_combo)
+    _add_form_field(grid, 0, tr('settings.theme'), theme_combo)
+
+    language_combo = ArrowComboBox()
+    language_combo.setMinimumWidth(min_width - 48)
+    for info in list_languages():
+        language_combo.addItem(info.name, info.code)
+    _select_combo_by_data(language_combo, initial.language)
+    _add_form_field(grid, 1, tr('settings.language'), language_combo)
 
     family_combo = ArrowComboBox()
     family_combo.setMinimumWidth(min_width - 48)
     for family_name in get_app_config().appearance.body_text_font_families:
         family_combo.addItem(family_name)
     _select_body_font_family(family_combo, initial.family)
-    _add_form_field(grid, 1, 'Editor Font Family', family_combo)
+    _add_form_field(grid, 2, tr('settings.editor_font_family'), family_combo)
 
     spin = GlyphSpinBox()
     spin.setRange(body_text_font_size_min(), body_text_font_size_max())
     spin.setValue(initial.size)
     spin.setMinimumWidth(120)
-    _add_form_field(grid, 2, 'Editor Font Size (px)', spin)
+    _add_form_field(grid, 3, tr('settings.editor_font_size'), spin)
 
     def current_settings() -> AppSettings:
         return AppSettings(
             theme=normalize_theme_name(theme_combo.currentData()),
             size=spin.value(),
             family=normalize_body_text_font_family(family_combo.currentText()),
+            language=language_combo.currentData(),
         )
 
     buttons = QDialogButtonBox(
         QDialogButtonBox.Apply | QDialogButtonBox.Save | QDialogButtonBox.Close,
         parent=dialog,
     )
+    translate_button_box(buttons)
     apply_btn = buttons.button(QDialogButtonBox.Apply)
 
     def update_apply_enabled() -> None:
@@ -240,6 +264,7 @@ def prompt_app_settings(
     layout.addWidget(buttons)
 
     theme_combo.currentIndexChanged.connect(lambda _i: update_apply_enabled())
+    language_combo.currentIndexChanged.connect(lambda _i: update_apply_enabled())
     family_combo.currentIndexChanged.connect(lambda _i: update_apply_enabled())
     spin.valueChanged.connect(lambda _v: update_apply_enabled())
 
@@ -252,7 +277,7 @@ def prompt_app_settings(
 
 
 def show_about_dialog(parent: QWidget) -> None:
-    dialog = _create_dialog(parent, 'About', min_width=360)
+    dialog = _create_dialog(parent, tr('about.title'), min_width=360)
 
     layout = QVBoxLayout(dialog)
     layout.setSpacing(8)
@@ -261,7 +286,7 @@ def show_about_dialog(parent: QWidget) -> None:
     title.setAlignment(Qt.AlignCenter)
     layout.addWidget(title)
 
-    version = QLabel(f'Version {APP_VERSION}')
+    version = QLabel(tr('about.version', version=APP_VERSION))
     version.setAlignment(Qt.AlignCenter)
     layout.addWidget(version)
 
@@ -272,6 +297,7 @@ def show_about_dialog(parent: QWidget) -> None:
     layout.addWidget(link)
 
     buttons = QDialogButtonBox(QDialogButtonBox.Ok, parent=dialog)
+    translate_button_box(buttons)
     buttons.accepted.connect(dialog.accept)
     layout.addWidget(buttons)
 

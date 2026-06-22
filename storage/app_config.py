@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from i18n.translator import DEFAULT_LOCALE, list_languages
 from log_util import logger
 from storage.paths import CONFIG_FILE
 from ui.appearance_defaults import (
@@ -90,6 +91,7 @@ class AppConfig:
     binary_hex_preview_bytes: int
     binary_hex_line_width: int
     tab_title_max_width: int
+    language: str
     themes: Dict[str, Dict[str, str]]
     appearance: AppearanceConfig
 
@@ -217,6 +219,14 @@ def _normalize_themes(raw_themes: Any) -> Dict[str, Dict[str, str]]:
     return normalized
 
 
+def _normalize_language(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        return DEFAULT_LOCALE
+    code = value.strip()
+    available = {info.code for info in list_languages()}
+    return code if code in available else DEFAULT_LOCALE
+
+
 def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     normalized: Dict[str, Any] = {}
     for key, default in INT_CONFIG_DEFAULTS.items():
@@ -224,6 +234,7 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
         normalized[key] = _clamp_int(raw.get(key), default, minimum, maximum)
     normalized['themes'] = _normalize_themes(raw.get('themes'))
     normalized['appearance'] = _normalize_appearance(raw.get('appearance'))
+    normalized['language'] = _normalize_language(raw.get('language'))
     return normalized
 
 
@@ -231,6 +242,7 @@ def _default_config() -> Dict[str, Any]:
     config = dict(INT_CONFIG_DEFAULTS)
     config['themes'] = _default_themes()
     config['appearance'] = default_appearance()
+    config['language'] = DEFAULT_LOCALE
     return config
 
 
@@ -240,6 +252,7 @@ def _to_app_config(data: Dict[str, Any]) -> AppConfig:
         binary_hex_preview_bytes=data['binary_hex_preview_bytes'],
         binary_hex_line_width=data['binary_hex_line_width'],
         tab_title_max_width=data['tab_title_max_width'],
+        language=data['language'],
         themes=data['themes'],
         appearance=_appearance_to_config(data['appearance']),
     )
@@ -270,6 +283,8 @@ def _config_needs_save(raw: Dict[str, Any], normalized: Dict[str, Any]) -> bool:
         if merge_theme_colors(theme_name, theme_raw) != normalized['themes'][theme_name]:
             return True
     if raw.get('appearance') != normalized['appearance']:
+        return True
+    if raw.get('language') != normalized['language']:
         return True
     return False
 
@@ -313,6 +328,43 @@ def init_app_config() -> AppConfig:
     """Load or create config.json; safe to call at application startup."""
     global _config_cache
     _config_cache = _load_config()
+    return _config_cache
+
+
+def save_app_preferences(
+    *,
+    theme: str,
+    body_text_font_family: str,
+    body_text_font_size_px: int,
+    language: str,
+    path: Path = CONFIG_FILE,
+) -> AppConfig:
+    """Persist settings-dialog choices to config.json and refresh the in-memory cache."""
+    global _config_cache, _raw_config_cache
+    cfg = get_app_config()
+    current = cfg.appearance
+    appearance = _normalize_appearance({
+        'theme': theme,
+        'ui_font_size_px': current.ui_font_size_px,
+        'table_font_size_px': current.table_font_size_px,
+        'status_font_size_px': current.status_font_size_px,
+        'tab_close_font_size_px': current.tab_close_font_size_px,
+        'ui_font_families_win': list(current.ui_font_families_win),
+        'body_text_font_family': body_text_font_family,
+        'body_text_font_size_px': body_text_font_size_px,
+        'body_text_font_size_min': current.body_text_font_size_min,
+        'body_text_font_size_max': current.body_text_font_size_max,
+        'body_text_font_families': list(current.body_text_font_families),
+        'body_text_font_fallbacks': list(current.body_text_font_fallbacks),
+    })
+    if _raw_config_cache is None:
+        _raw_config_cache = _normalize_config(_default_config())
+    data = dict(_raw_config_cache)
+    data['appearance'] = appearance
+    data['language'] = _normalize_language(language)
+    _save_config(path, data)
+    _raw_config_cache = data
+    _config_cache = _to_app_config(data)
     return _config_cache
 
 

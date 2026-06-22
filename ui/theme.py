@@ -454,7 +454,6 @@ QPushButton#primaryButton {{
     background-color: {p.highlight};
     color: {p.highlight_text};
     border: 1px solid {p.highlight};
-    font-weight: bold;
 }}
 
 QPushButton#primaryButton:hover {{
