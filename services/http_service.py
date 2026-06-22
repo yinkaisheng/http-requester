@@ -9,7 +9,14 @@ from typing import Dict, List, Optional, Tuple, Union
 import requests
 
 from log_util import logger
-from models.http_models import BodyType, DEFAULT_REQUEST_TIMEOUT_SECONDS, HttpRequest, HttpResponse
+from models.http_models import (
+    BodyType,
+    DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    HttpRequest,
+    HttpResponse,
+    decode_bytes_to_text,
+    validate_json_body_text,
+)
 
 MAX_LOG_BODY_BYTES = 64 * 1024
 
@@ -30,14 +37,12 @@ def _prepare_body(req: HttpRequest) -> Tuple[Optional[Union[str, bytes, Dict]], 
     opened_files: List = []
 
     if req.body_type == BodyType.RAW:
-        data = req.body_text.encode('utf-8')
+        if req.body_text:
+            data = req.body_text.encode('utf-8')
     elif req.body_type == BodyType.JSON:
         text = req.body_text.strip()
         if text:
-            try:
-                json_body = json.loads(text)
-            except json.JSONDecodeError:
-                data = req.body_text.encode('utf-8')
+            json_body = json.loads(text)
     elif req.body_type == BodyType.FORM:
         data = {}
         files = {}
@@ -78,24 +83,13 @@ def _format_headers(headers: Dict[str, str]) -> str:
     return '\n'.join(f'  {key}: {value}' for key, value in headers.items())
 
 
-def _decode_body(body: bytes) -> str:
-    if not body:
-        return ''
-    for encoding in ('utf-8', 'gbk', 'latin-1'):
-        try:
-            return body.decode(encoding)
-        except UnicodeDecodeError:
-            continue
-    return body.decode('utf-8', errors='replace')
-
-
 def _body_for_log(body: bytes) -> str:
     if not body:
         return '(empty)'
     if len(body) > MAX_LOG_BODY_BYTES:
-        text = _decode_body(body[:MAX_LOG_BODY_BYTES])
+        text = decode_bytes_to_text(body[:MAX_LOG_BODY_BYTES])
         return f'{text}\n... ({len(body)} bytes total, truncated)'
-    return _decode_body(body)
+    return decode_bytes_to_text(body)
 
 
 def send_request(req: HttpRequest) -> HttpResponse:
@@ -106,12 +100,19 @@ def send_request(req: HttpRequest) -> HttpResponse:
 
     method = req.method.upper()
     headers = _enabled_headers(req)
+
+    if req.body_type == BodyType.JSON and req.body_text.strip():
+        json_error = validate_json_body_text(req.body_text)
+        if json_error:
+            logger.error(f'HTTP request failed: invalid JSON body: {json_error}')
+            return HttpResponse(error=f'Invalid JSON body: {json_error}')
+
     data, json_body, files, opened_files = _prepare_body(req)
 
     has_content_type = any(k.lower() == 'content-type' for k in headers)
     if req.body_type == BodyType.JSON and not has_content_type:
         headers['Content-Type'] = 'application/json'
-    elif req.body_type == BodyType.RAW and not has_content_type:
+    elif req.body_type == BodyType.RAW and req.body_text.strip() and not has_content_type:
         headers['Content-Type'] = 'text/plain'
 
     timeout = req.timeout_seconds if req.timeout_seconds > 0 else DEFAULT_REQUEST_TIMEOUT_SECONDS

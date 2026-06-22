@@ -27,12 +27,14 @@ from PyQt5.QtWidgets import (
 from models.http_models import (
     DEFAULT_REQUEST_TIMEOUT_SECONDS,
     HTTP_METHODS,
+    BodyType,
     HistoryRecord,
     HttpRequest,
     HttpResponse,
     decode_stored_response_body,
     encode_response_body_for_storage,
     url_without_query,
+    validate_json_body_text,
 )
 from pyqt_async_task import AsyncTask, MsgIDThreadExit
 from services.curl_export import format_curl_linux_command
@@ -124,12 +126,13 @@ class RequestTab(QWidget):
         super().__init__(parent)
         self.history_store = history_store
         self.async_task = async_task
-        self.async_task.setMsgIDName(MSG_HTTP_DONE, 'MSG_HTTP_DONE')
         self.record_id: Optional[str] = record.id if record else None
         self._record = record
         self._draft_name = ''
         self._cached_response: Optional[dict] = None
         self._splitter_ratios: Optional[Dict[str, float]] = None
+        self._closed = False
+        self._active_task_id: Optional[int] = None
         self._init_ui()
         if record:
             self.load_record(record)
@@ -142,6 +145,7 @@ class RequestTab(QWidget):
         self.method_combo = ArrowComboBox()
         self.method_combo.addItems(HTTP_METHODS)
         self.ssl_verify_check = AccentCheckBox('SSL Verify')
+        self.ssl_verify_check.setChecked(True)
         self.url_edit = QLineEdit()
         self.url_edit.setPlaceholderText('https://api.example.com/path')
         timeout_row = QWidget()
@@ -482,8 +486,21 @@ class RequestTab(QWidget):
         self.headers_panel.show_raw_mode()
         self._clear_response_display()
 
+    def prepare_close(self) -> None:
+        """Mark tab closed so in-flight HTTP callbacks are ignored."""
+        self._closed = True
+
     def _on_send_clicked(self) -> None:
         req = self.collect_request()
+        if req.body_type == BodyType.JSON and req.body_text.strip():
+            json_error = validate_json_body_text(req.body_text)
+            if json_error:
+                QMessageBox.warning(
+                    self,
+                    'Invalid JSON',
+                    f'Request body is not valid JSON:\n{json_error}',
+                )
+                return
         if req.method.upper() == 'GET' and req.has_body():
             reply = QMessageBox.question(
                 self,
@@ -506,17 +523,24 @@ class RequestTab(QWidget):
         self._set_status_text('Sending...')
         self._set_status_style('statusPending')
         try:
-            self.async_task.runTaskInThread(_http_worker, req, self._on_http_result)
+            self._active_task_id = self.async_task.runTaskInThread(
+                _http_worker, req, self._on_http_result
+            )
         except Exception:
+            self._active_task_id = None
             self.send_btn.setEnabled(True)
             self._set_status_text('Error: Failed to start request')
             self._set_status_style('statusError')
 
     def _on_http_result(self, task_id: int, msg_id: int, data: Any) -> None:
-        if msg_id == MsgIDThreadExit:
-            self.send_btn.setEnabled(True)
+        if self._closed:
             return
-        if msg_id != MSG_HTTP_DONE:
+        if msg_id == MsgIDThreadExit:
+            if task_id == self._active_task_id:
+                self._active_task_id = None
+                self.send_btn.setEnabled(True)
+            return
+        if msg_id != MSG_HTTP_DONE or task_id != self._active_task_id:
             return
 
         resp: HttpResponse = data

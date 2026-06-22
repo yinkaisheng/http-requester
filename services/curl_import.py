@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import json
 import re
 import shlex
 from typing import List, Optional
@@ -13,6 +12,7 @@ from models.http_models import (
     FormField,
     HeaderItem,
     HttpRequest,
+    detect_import_body_type,
 )
 from services.path_import import normalize_imported_file_paths
 
@@ -22,20 +22,6 @@ def _normalize_curl_text(text: str) -> str:
     text = re.sub(r'^\$\s*', '', text)
     text = re.sub(r'\\\s*\r?\n', ' ', text)
     return text.strip()
-
-
-def _detect_json_body(body_text: str, headers: List[HeaderItem]) -> BodyType:
-    for item in headers:
-        if item.key.lower() == 'content-type' and 'json' in item.value.lower():
-            return BodyType.JSON
-    stripped = body_text.strip()
-    if not stripped:
-        return BodyType.RAW
-    try:
-        json.loads(stripped)
-        return BodyType.JSON
-    except json.JSONDecodeError:
-        return BodyType.RAW
 
 
 def parse_curl_command(text: str) -> Optional[HttpRequest]:
@@ -62,7 +48,7 @@ def parse_curl_command(text: str) -> Optional[HttpRequest]:
     body_text = ''
     body_type = BodyType.NONE
     form_fields: List[FormField] = []
-    ssl_verify = False
+    ssl_verify = True
     timeout_seconds = DEFAULT_REQUEST_TIMEOUT_SECONDS
 
     index = 0
@@ -135,7 +121,7 @@ def parse_curl_command(text: str) -> Optional[HttpRequest]:
         return None
 
     if body_type == BodyType.RAW and body_text:
-        body_type = _detect_json_body(body_text, headers)
+        body_type = detect_import_body_type(body_text, headers)
 
     if method == 'GET' and (
         (body_type in (BodyType.RAW, BodyType.JSON) and body_text)

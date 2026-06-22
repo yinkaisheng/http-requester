@@ -25,7 +25,7 @@ from models.http_models import HistoryRecord
 from storage.session_store import SessionStore
 from ui.dialogs import AppSettings, prompt_app_settings, show_about_dialog
 from ui.history_panel import HistoryPanel
-from ui.request_tab import RequestTab, splitter_ratio_to_sizes, splitter_sizes_to_ratio
+from ui.request_tab import RequestTab, splitter_ratio_to_sizes, splitter_sizes_to_ratio, MSG_HTTP_DONE
 from ui.request_tab_widget import RequestTabWidget
 from ui.theme import (
     apply_app_theme,
@@ -48,6 +48,7 @@ class MainWindow(QMainWindow):
         self.session_store = SessionStore()
         self.async_task = AsyncTask()
         self.async_task.debugPrint = False
+        self.async_task.setMsgIDName(MSG_HTTP_DONE, 'MSG_HTTP_DONE')
         self._session_save_timer = QTimer(self)
         self._session_save_timer.setSingleShot(True)
         self._session_save_timer.setInterval(500)

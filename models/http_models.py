@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import json
 import uuid
 import base64
 import re
@@ -21,6 +22,44 @@ class BodyType(str, Enum):
 
 HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 30
+BODY_TEXT_ENCODINGS = ('utf-8', 'gbk', 'latin-1')
+TEXT_BODY_ENCODINGS = ('utf-8', 'gbk')
+
+
+def decode_bytes_to_text(body: bytes) -> str:
+    if not body:
+        return ''
+    for encoding in BODY_TEXT_ENCODINGS:
+        try:
+            return body.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return body.decode('utf-8', errors='replace')
+
+
+def detect_import_body_type(body_text: str, headers: List['HeaderItem']) -> BodyType:
+    for item in headers:
+        if item.key.lower() == 'content-type' and 'json' in item.value.lower():
+            return BodyType.JSON
+    stripped = body_text.strip()
+    if not stripped:
+        return BodyType.RAW
+    try:
+        json.loads(stripped)
+        return BodyType.JSON
+    except json.JSONDecodeError:
+        return BodyType.RAW
+
+
+def validate_json_body_text(body_text: str) -> Optional[str]:
+    text = body_text.strip()
+    if not text:
+        return None
+    try:
+        json.loads(text)
+        return None
+    except json.JSONDecodeError as exc:
+        return str(exc)
 
 
 def _now_iso() -> str:
@@ -47,7 +86,7 @@ def is_text_body(body: bytes) -> bool:
         return True
     if b'\x00' in body:
         return False
-    for encoding in ('utf-8', 'gbk'):
+    for encoding in TEXT_BODY_ENCODINGS:
         try:
             body.decode(encoding)
             return True
@@ -135,7 +174,7 @@ class HttpRequest:
     body_text: str = ''
     form_fields: List[FormField] = field(default_factory=list)
     file_path: str = ''
-    ssl_verify: bool = False
+    ssl_verify: bool = True
     timeout_seconds: int = DEFAULT_REQUEST_TIMEOUT_SECONDS
 
     def to_dict(self) -> Dict[str, Any]:
@@ -168,7 +207,7 @@ class HttpRequest:
             body_text=data.get('body_text', ''),
             form_fields=[FormField.from_dict(f) for f in data.get('form_fields', [])],
             file_path=data.get('file_path', ''),
-            ssl_verify=data.get('ssl_verify', False),
+            ssl_verify=data.get('ssl_verify', True),
             timeout_seconds=timeout,
         )
 
@@ -200,14 +239,7 @@ class HttpResponse:
         return not self.error and 200 <= self.status_code < 300
 
     def body_text(self) -> str:
-        if not self.body:
-            return ''
-        for encoding in ('utf-8', 'gbk', 'latin-1'):
-            try:
-                return self.body.decode(encoding)
-            except UnicodeDecodeError:
-                continue
-        return self.body.decode('utf-8', errors='replace')
+        return decode_bytes_to_text(self.body)
 
 
 @dataclass

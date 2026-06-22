@@ -162,7 +162,12 @@ class RequestTabWidget(QTabWidget):
 
     def _remove_all_tabs(self) -> None:
         while self.count() > 0:
+            widget = self.widget(0)
+            if isinstance(widget, RequestTab):
+                widget.prepare_close()
             self.removeTab(0)
+            if widget is not None:
+                widget.deleteLater()
         self._record_tab_map.clear()
 
     def close_current_tab(self) -> None:
@@ -199,10 +204,13 @@ class RequestTabWidget(QTabWidget):
             return
         widget = self.widget(index)
         if isinstance(widget, RequestTab):
+            widget.prepare_close()
             record_id = widget.get_record_id()
             if record_id and record_id in self._record_tab_map:
                 del self._record_tab_map[record_id]
         self.removeTab(index)
+        if widget is not None:
+            widget.deleteLater()
         self._rebuild_map()
         self._ensure_at_least_one_tab()
         self.workspace_changed.emit()
