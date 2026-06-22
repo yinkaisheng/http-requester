@@ -49,6 +49,7 @@ from ui.headers_editor import (
     RequestHeadersPanel,
     _set_compact_table_header,
     add_section_header_widget,
+    apply_section_header_row_height,
     attach_header_table_menu,
     configure_section_header_layout,
     fill_key_value_table,
@@ -187,6 +188,8 @@ class RequestTab(QWidget):
         layout.addLayout(toolbar)
 
         self.content_splitter = QSplitter(Qt.Horizontal)
+        self.content_splitter.setObjectName('contentSplitter')
+        self.content_splitter.setHandleWidth(4)
 
         self.left_splitter = QSplitter(Qt.Vertical)
         self.headers_panel = RequestHeadersPanel(
@@ -230,6 +233,7 @@ class RequestTab(QWidget):
         add_section_header_widget(rh_header, rh_title)
         rh_header.addStretch()
         add_section_header_widget(rh_header, self.status_label)
+        apply_section_header_row_height(rh_header_row)
         rh_layout.addWidget(rh_header_row)
         rh_layout.addWidget(self.response_headers_table, 1)
 

@@ -296,6 +296,21 @@ QSplitter::handle:hover {{
     background-color: {p.highlight};
 }}
 
+QSplitter#contentSplitter {{
+    background-color: {p.background_primary};
+}}
+
+QSplitter#contentSplitter::handle:horizontal {{
+    background-color: {p.background_primary};
+    width: 4px;
+    margin: 0;
+    border: none;
+}}
+
+QSplitter#contentSplitter::handle:horizontal:hover {{
+    background-color: {p.background_primary};
+}}
+
 QTabWidget::pane {{
     border: 1px solid {p.border};
     border-radius: 4px;

@@ -6,7 +6,7 @@ import base64
 from typing import Callable, Dict, List, Optional, Tuple
 
 from PyQt5.QtCore import QPointF, QPoint, Qt, QEvent, QObject
-from PyQt5.QtGui import QClipboard, QFontMetrics, QKeyEvent, QPaintEvent, QPainter, QPen
+from PyQt5.QtGui import QClipboard, QFont, QFontMetrics, QKeyEvent, QPaintEvent, QPainter, QPen
 from PyQt5.QtWidgets import (
     QApplication,
     QAbstractItemView,
@@ -34,6 +34,8 @@ from ui.theme import check_mark_color, table_font_size_px
 
 TABLE_HEADER_HEIGHT = 22
 SECTION_HEADER_LAYOUT_MARGIN_V = 2
+HEADER_MODE_BUTTON_PADDING_V = 2
+HEADER_MODE_BUTTON_BORDER_BOTTOM_PX = 2
 TABLE_ROW_EXTRA_PADDING = 12
 HEADER_TABLE_ROW_EXTRA_PADDING = 6
 HEADER_TABLE_EDITABLE_MIN_HEIGHT = 24
@@ -59,6 +61,23 @@ def configure_section_header_layout(layout: QHBoxLayout) -> None:
 
 def add_section_header_widget(layout: QHBoxLayout, widget: QWidget) -> None:
     layout.addWidget(widget, 0, Qt.AlignVCenter)
+
+
+def section_header_row_height(font: Optional[QFont] = None) -> int:
+    if font is None:
+        app = QApplication.instance()
+        font = app.font() if app is not None else QFont()
+    metrics = QFontMetrics(font)
+    inner = (
+        metrics.height()
+        + HEADER_MODE_BUTTON_PADDING_V * 2
+        + HEADER_MODE_BUTTON_BORDER_BOTTOM_PX
+    )
+    return inner + SECTION_HEADER_LAYOUT_MARGIN_V * 2
+
+
+def apply_section_header_row_height(row: QWidget, font: Optional[QFont] = None) -> None:
+    row.setFixedHeight(section_header_row_height(font))
 
 
 def _compact_action_button(text: str) -> QPushButton:
@@ -723,7 +742,7 @@ class RequestHeadersPanel(QWidget):
     def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(0)
 
         header_row = QWidget()
         header_layout = QHBoxLayout(header_row)
@@ -744,6 +763,7 @@ class RequestHeadersPanel(QWidget):
         header_layout.addWidget(self.raw_btn, 0, Qt.AlignVCenter)
         header_layout.addWidget(self.sent_btn, 0, Qt.AlignVCenter)
         header_layout.addStretch()
+        apply_section_header_row_height(header_row)
         layout.addWidget(header_row)
 
         self.stack = QStackedWidget()
