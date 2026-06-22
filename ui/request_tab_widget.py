@@ -42,6 +42,15 @@ class RequestTabWidget(QTabWidget):
         self.tabBar().tabMoved.connect(self.workspace_changed.emit)
         self.tabBarDoubleClicked.connect(self._on_tab_bar_double_clicked)
         self.tabBar().installEventFilter(self)
+        self.installEventFilter(self)
+
+    def _is_tab_header_blank_area(self, pos) -> bool:
+        tab_bar = self.tabBar()
+        if pos.y() > tab_bar.height():
+            return False
+        if not tab_bar.geometry().contains(pos):
+            return True
+        return tab_bar.tabAt(tab_bar.mapFrom(self, pos)) < 0
 
     def eventFilter(self, obj, event) -> bool:
         if obj is self.tabBar() and event.type() == QEvent.MouseButtonRelease:
@@ -51,6 +60,15 @@ class RequestTabWidget(QTabWidget):
                 if index >= 0:
                     self._close_tab_at_index(index)
                     return True
+        if (
+            obj is self
+            and event.type() == QEvent.MouseButtonDblClick
+            and isinstance(event, QMouseEvent)
+            and event.button() == Qt.LeftButton
+            and self._is_tab_header_blank_area(event.pos())
+        ):
+            self.new_request()
+            return True
         return super().eventFilter(obj, event)
 
     def addTab(self, widget: QWidget, label: str) -> int:

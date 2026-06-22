@@ -104,12 +104,15 @@ class MainWindow(QMainWindow):
         self._main_splitter.setSizes([280, 920])
 
         main_layout.addWidget(self._main_splitter)
-        self._setup_tab_close_shortcut()
+        self._setup_shortcuts()
 
-    def _setup_tab_close_shortcut(self) -> None:
-        key = 'Ctrl+F4' if sys.platform == 'win32' else 'Ctrl+W'
-        shortcut = QShortcut(QKeySequence(key), self)
-        shortcut.activated.connect(self.request_tabs.close_current_tab)
+    def _setup_shortcuts(self) -> None:
+        close_key = 'Ctrl+F4' if sys.platform == 'win32' else 'Ctrl+W'
+        close_shortcut = QShortcut(QKeySequence(close_key), self)
+        close_shortcut.activated.connect(self.request_tabs.close_current_tab)
+
+        new_shortcut = QShortcut(QKeySequence('Ctrl+N'), self)
+        new_shortcut.activated.connect(self._on_new_request)
 
     def _connect_signals(self) -> None:
         self.history_panel.record_selected.connect(self._on_record_selected)
