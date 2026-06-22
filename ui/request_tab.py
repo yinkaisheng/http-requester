@@ -48,7 +48,9 @@ from ui.headers_editor import (
     COPY_POWERSHELL_MENU_TEXT,
     RequestHeadersPanel,
     _set_compact_table_header,
+    add_section_header_widget,
     attach_header_table_menu,
+    configure_section_header_layout,
     fill_key_value_table,
 )
 from ui.widgets import AccentCheckBox, ArrowComboBox, GlyphSpinBox
@@ -214,12 +216,10 @@ class RequestTab(QWidget):
         response_headers_block = QWidget()
         rh_layout = QVBoxLayout(response_headers_block)
         rh_layout.setContentsMargins(0, 0, 0, 0)
-        rh_layout.setSpacing(4)
+        rh_layout.setSpacing(0)
         rh_header_row = QWidget()
-        rh_header_row.setFixedHeight(BodyEditor.section_header_height())
         rh_header = QHBoxLayout(rh_header_row)
-        rh_header.setContentsMargins(0, 0, 0, 0)
-        rh_header.setSpacing(8)
+        configure_section_header_layout(rh_header)
         rh_title = QLabel('Response Headers')
         rh_title.setObjectName('sectionTitle')
         rh_title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -227,9 +227,9 @@ class RequestTab(QWidget):
         self.status_label.setObjectName('statusPending')
         self.status_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._set_status_text('Waiting to send request')
-        rh_header.addWidget(rh_title)
+        add_section_header_widget(rh_header, rh_title)
         rh_header.addStretch()
-        rh_header.addWidget(self.status_label)
+        add_section_header_widget(rh_header, self.status_label)
         rh_layout.addWidget(rh_header_row)
         rh_layout.addWidget(self.response_headers_table, 1)
 

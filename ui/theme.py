@@ -338,7 +338,7 @@ QTabBar::close-button {{
 QLabel#sectionTitle {{
     font-weight: bold;
     color: {p.text_heading};
-    padding: 2px 0;
+    padding: 0;
     margin: 0;
 }}
 
@@ -363,9 +363,21 @@ QPushButton#headerModeButton:hover {{
 }}
 
 QPushButton#compactButton {{
-    padding: 1px 10px;
+    background-color: {p.background_secondary};
+    border: 1px solid {p.border};
+    border-radius: 4px;
+    padding: 0px 10px;
     min-height: 0px;
     margin: 0;
+}}
+
+QPushButton#compactButton:hover {{
+    background-color: {p.background_hover};
+    border-color: {p.border_emphasis};
+}}
+
+QPushButton#compactButton:pressed {{
+    background-color: {p.border};
 }}
 
 QPushButton#formCellButton {{

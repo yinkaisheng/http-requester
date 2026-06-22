@@ -28,7 +28,11 @@ from PyQt5.QtWidgets import (
 
 from models.http_models import is_text_body
 from storage.app_config import get_app_config
-from ui.body_editor import BodyEditor
+from ui.headers_editor import (
+    _compact_action_button,
+    add_section_header_widget,
+    configure_section_header_layout,
+)
 from ui.notifications import show_system_tip
 
 _VIEW_RAW = 0
@@ -237,7 +241,7 @@ class ResponseBodyPanel(QWidget):
     def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(0)
 
         self.view_group = QButtonGroup(self)
         self.radio_raw = QRadioButton('Raw')
@@ -247,8 +251,7 @@ class ResponseBodyPanel(QWidget):
         for view_id, radio in enumerate([self.radio_raw, self.radio_json, self.radio_tree]):
             self.view_group.addButton(radio, view_id)
 
-        self.save_raw_btn = QPushButton('Save Raw')
-        self.save_raw_btn.setObjectName('compactButton')
+        self.save_raw_btn = _compact_action_button('Save Raw')
         self.save_raw_btn.setVisible(False)
         self.save_raw_btn.clicked.connect(self._save_raw)
 
@@ -297,17 +300,15 @@ class ResponseBodyPanel(QWidget):
 
     def _build_header_row(self) -> QWidget:
         row = QWidget()
-        row.setFixedHeight(BodyEditor.section_header_height())
         header_layout = QHBoxLayout(row)
-        header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.setSpacing(8)
+        configure_section_header_layout(header_layout)
         title = QLabel('Response Body')
         title.setObjectName('sectionTitle')
         title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        header_layout.addWidget(title)
+        add_section_header_widget(header_layout, title)
         for radio in (self.radio_raw, self.radio_json, self.radio_tree):
-            header_layout.addWidget(radio)
-        header_layout.addWidget(self.save_raw_btn)
+            add_section_header_widget(header_layout, radio)
+        add_section_header_widget(header_layout, self.save_raw_btn)
         header_layout.addStretch()
         return row
 

@@ -23,7 +23,14 @@ from PyQt5.QtWidgets import (
 )
 
 from models.http_models import BodyType, FormField
-from ui.headers_editor import HEADER_ROW_HEIGHT, TableEditDelegate, _compact_action_button, _set_compact_table_header, _table_row_height
+from ui.headers_editor import (
+    TableEditDelegate,
+    _compact_action_button,
+    _set_compact_table_header,
+    _table_row_height,
+    add_section_header_widget,
+    configure_section_header_layout,
+)
 
 FORM_CELL_MARGIN_V = 2
 FORM_CELL_MARGIN_H = 4
@@ -44,7 +51,7 @@ class BodyEditor(QWidget):
     def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(0)
 
         self.type_group = QButtonGroup(self)
         self.radio_raw = QRadioButton('Raw')
@@ -72,25 +79,19 @@ class BodyEditor(QWidget):
 
     def _build_header_row(self) -> QWidget:
         row = QWidget()
-        row.setFixedHeight(HEADER_ROW_HEIGHT)
         header_layout = QHBoxLayout(row)
-        header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.setSpacing(8)
+        configure_section_header_layout(header_layout)
         title = QLabel('Request Body')
         title.setObjectName('sectionTitle')
         title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        header_layout.addWidget(title)
+        add_section_header_widget(header_layout, title)
         for radio in (
             self.radio_raw, self.radio_json,
             self.radio_form, self.radio_file,
         ):
-            header_layout.addWidget(radio)
+            add_section_header_widget(header_layout, radio)
         header_layout.addStretch()
         return row
-
-    @staticmethod
-    def section_header_height() -> int:
-        return HEADER_ROW_HEIGHT
 
     def _init_text_page(self) -> None:
         page = QWidget()

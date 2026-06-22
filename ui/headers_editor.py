@@ -33,8 +33,7 @@ from ui.dialogs import prompt_basic_auth, prompt_bearer_token
 from ui.theme import check_mark_color, table_font_size_px
 
 TABLE_HEADER_HEIGHT = 22
-HEADER_ROW_HEIGHT = 24
-HEADER_TABLE_ROW_HEIGHT = HEADER_ROW_HEIGHT - 4
+SECTION_HEADER_LAYOUT_MARGIN_V = 2
 TABLE_ROW_EXTRA_PADDING = 12
 HEADER_TABLE_ROW_EXTRA_PADDING = 6
 HEADER_TABLE_EDITABLE_MIN_HEIGHT = 24
@@ -52,11 +51,20 @@ BASIC_AUTH_MENU_TEXT = 'Basic Auth...'
 BEARER_TOKEN_MENU_TEXT = 'Bearer Token...'
 
 
+def configure_section_header_layout(layout: QHBoxLayout) -> None:
+    layout.setContentsMargins(0, SECTION_HEADER_LAYOUT_MARGIN_V, 0, SECTION_HEADER_LAYOUT_MARGIN_V)
+    layout.setSpacing(8)
+    layout.setAlignment(Qt.AlignVCenter)
+
+
+def add_section_header_widget(layout: QHBoxLayout, widget: QWidget) -> None:
+    layout.addWidget(widget, 0, Qt.AlignVCenter)
+
+
 def _compact_action_button(text: str) -> QPushButton:
     btn = QPushButton(text)
     btn.setObjectName('compactButton')
-    btn.ensurePolished()
-    btn.setMinimumHeight(btn.sizeHint().height())
+    btn.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
     return btn
 
 
@@ -95,12 +103,11 @@ def _apply_header_table_font(table: QTableWidget, *, header_table: bool = False)
 def _table_row_height(table: QTableWidget, editable: bool = False, *, header_table: bool = False) -> int:
     metrics = QFontMetrics(table.font())
     extra_padding = HEADER_TABLE_ROW_EXTRA_PADDING if header_table else TABLE_ROW_EXTRA_PADDING
-    min_height = HEADER_TABLE_ROW_HEIGHT if header_table else HEADER_ROW_HEIGHT
     base = metrics.height() + extra_padding
     if editable:
         editable_min = HEADER_TABLE_EDITABLE_MIN_HEIGHT if header_table else 30
         return max(base, editable_min)
-    return max(base, min_height)
+    return base
 
 
 def _set_compact_table_header(table: QTableWidget, editable: bool = False, *, header_table: bool = False) -> None:
@@ -719,10 +726,8 @@ class RequestHeadersPanel(QWidget):
         layout.setSpacing(4)
 
         header_row = QWidget()
-        header_row.setFixedHeight(HEADER_ROW_HEIGHT)
         header_layout = QHBoxLayout(header_row)
-        header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.setSpacing(4)
+        configure_section_header_layout(header_layout)
 
         self.mode_group = QButtonGroup(self)
         self.raw_btn = QPushButton('Request Headers User')
@@ -736,8 +741,8 @@ class RequestHeadersPanel(QWidget):
         self.raw_btn.clicked.connect(lambda: self._switch_mode('raw'))
         self.sent_btn.clicked.connect(lambda: self._switch_mode('sent'))
 
-        header_layout.addWidget(self.raw_btn)
-        header_layout.addWidget(self.sent_btn)
+        header_layout.addWidget(self.raw_btn, 0, Qt.AlignVCenter)
+        header_layout.addWidget(self.sent_btn, 0, Qt.AlignVCenter)
         header_layout.addStretch()
         layout.addWidget(header_row)
 
