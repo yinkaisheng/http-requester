@@ -26,6 +26,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from models.http_models import is_text_body
 from ui.body_editor import BodyEditor
 from ui.notifications import show_system_tip
 
@@ -34,6 +35,8 @@ _VIEW_JSON = 1
 _VIEW_JSON_TREE = 2
 
 MAX_PRETTY_PRINT_BYTES = 5 * 1024 * 1024  # 5 MB
+BINARY_HEX_PREVIEW_BYTES = 1024 * 10
+BINARY_HEX_LINE_WIDTH = 8
 _JSON_FORMAT_LIMIT_TIP = (
     'Response body exceeds 5 MB; JSON formatting and tree view are unavailable.'
 )
@@ -88,6 +91,29 @@ def _is_image_content_type(headers: Dict[str, str]) -> bool:
         if media_type.startswith('image/'):
             return True
     return False
+
+
+def _ascii_repr(chunk: bytes) -> str:
+    return ''.join(chr(byte) if 32 <= byte < 127 else '.' for byte in chunk)
+
+
+def format_hex_preview(
+    data: bytes,
+    preview_bytes: int = BINARY_HEX_PREVIEW_BYTES,
+    line_width: int = BINARY_HEX_LINE_WIDTH,
+) -> str:
+    preview = data[:preview_bytes]
+    hex_column_width = line_width * 3 - 1
+    lines = []
+    for offset in range(0, len(preview), line_width):
+        chunk = preview[offset:offset + line_width]
+        hex_part = ' '.join(f'{byte:02x}' for byte in chunk).ljust(hex_column_width)
+        ascii_part = _ascii_repr(chunk).ljust(line_width)
+        lines.append(f'{offset:08x}  {hex_part}  {ascii_part}')
+    if len(data) > preview_bytes:
+        remaining = len(data) - preview_bytes
+        lines.append(f'... ({remaining} more bytes, {len(data)} bytes total)')
+    return '\n'.join(lines)
 
 
 def _looks_like_json(body_text: str) -> bool:
@@ -205,6 +231,7 @@ class ResponseBodyPanel(QWidget):
         self._headers: Dict[str, str] = {}
         self._raw_bytes: bytes = b''
         self._is_image = False
+        self._is_binary_non_image = False
         self._original_pixmap: Optional[QPixmap] = None
         self._init_ui()
 
@@ -308,8 +335,14 @@ class ResponseBodyPanel(QWidget):
         self.radio_raw.setChecked(True)
         self.view_group.blockSignals(False)
 
+    def _raw_display_text(self) -> str:
+        if self._is_binary_non_image:
+            header = self._raw_body.strip() or f'[Binary data, {len(self._raw_bytes)} bytes]'
+            return f'{header}\n\n{format_hex_preview(self._raw_bytes)}'
+        return self._raw_body
+
     def _set_view_enabled(self) -> None:
-        if self._is_image:
+        if self._is_image or self._is_binary_non_image:
             self.radio_json.setEnabled(False)
             self.radio_tree.setEnabled(False)
             return
@@ -329,6 +362,9 @@ class ResponseBodyPanel(QWidget):
         self._headers = dict(headers or {})
         self._raw_bytes = raw_bytes
         self._is_image = bool(raw_bytes) and _is_image_content_type(self._headers)
+        self._is_binary_non_image = (
+            bool(raw_bytes) and not self._is_image and not is_text_body(raw_bytes)
+        )
         self._original_pixmap = None
         self._image_page.set_pixmap(None)
         self._image_page.setToolTip('')
@@ -345,6 +381,7 @@ class ResponseBodyPanel(QWidget):
         self._headers = {}
         self._raw_bytes = b''
         self._is_image = False
+        self._is_binary_non_image = False
         self._original_pixmap = None
         self._image_page.set_pixmap(None)
         self._image_page.setToolTip('')
@@ -373,7 +410,7 @@ class ResponseBodyPanel(QWidget):
         view_id = self.view_group.checkedId()
         if view_id == _VIEW_RAW:
             self.stack.setCurrentIndex(0)
-            self.text_edit.setPlainText(self._raw_body)
+            self.text_edit.setPlainText(self._raw_display_text())
             return
         if view_id == _VIEW_JSON:
             self.stack.setCurrentIndex(0)
