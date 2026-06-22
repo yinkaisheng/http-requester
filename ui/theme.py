@@ -468,14 +468,11 @@ QPushButton#primaryButton:pressed {{
 QToolButton#settingsButton, QToolButton#aboutButton {{
     background-color: {p.background_secondary};
     border: 1px solid {p.border};
-    border-radius: 3px;
+    border-radius: 4px;
     color: {p.text_primary};
-    padding: 0;
-    min-width: 28px;
-    max-width: 28px;
-    min-height: 24px;
-    max-height: 24px;
-    font-size: {appearance.toolbar_icon_font_size_px}px;
+    padding: 5px 8px;
+    min-width: 0;
+    min-height: 0;
 }}
 
 QToolButton#settingsButton:hover, QToolButton#aboutButton:hover {{

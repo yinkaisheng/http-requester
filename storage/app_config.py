@@ -62,9 +62,6 @@ class AppearanceConfig:
     # 请求 Tab 关闭按钮字号（px）：QPushButton#tabCloseButton。
     tab_close_font_size_px: int
 
-    # 工具栏图标按钮字号（px）：QToolButton#settingsButton / aboutButton（⚙、ⓘ）。
-    toolbar_icon_font_size_px: int
-
     # Windows UI 字体候选列表（按顺序取第一个系统已安装的字体作为 QApplication 默认 font-family）。
     ui_font_families_win: Tuple[str, ...]
 
@@ -194,7 +191,6 @@ def _appearance_to_config(appearance: Dict[str, Any]) -> AppearanceConfig:
         table_font_size_px=appearance['table_font_size_px'],
         status_font_size_px=appearance['status_font_size_px'],
         tab_close_font_size_px=appearance['tab_close_font_size_px'],
-        toolbar_icon_font_size_px=appearance['toolbar_icon_font_size_px'],
         ui_font_families_win=tuple(appearance['ui_font_families_win']),
         body_text_font_family=appearance['body_text_font_family'],
         body_text_font_size_px=appearance['body_text_font_size_px'],
@@ -337,7 +333,6 @@ def save_appearance_settings(
         'table_font_size_px': current.table_font_size_px,
         'status_font_size_px': current.status_font_size_px,
         'tab_close_font_size_px': current.tab_close_font_size_px,
-        'toolbar_icon_font_size_px': current.toolbar_icon_font_size_px,
         'ui_font_families_win': list(current.ui_font_families_win),
         'body_text_font_family': body_text_font_family,
         'body_text_font_size_px': body_text_font_size_px,

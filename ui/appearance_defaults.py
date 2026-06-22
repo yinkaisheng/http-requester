@@ -13,7 +13,6 @@ DEFAULT_UI_FONT_SIZE_PX = 14
 DEFAULT_TABLE_FONT_SIZE_PX = 14
 DEFAULT_STATUS_FONT_SIZE_PX = 12
 DEFAULT_TAB_CLOSE_FONT_SIZE_PX = 14
-DEFAULT_TOOLBAR_ICON_FONT_SIZE_PX = 16
 DEFAULT_UI_FONT_FAMILIES_WIN: Tuple[str, ...] = (
     'Microsoft YaHei UI',
     'Segoe UI',
@@ -42,7 +41,6 @@ _APPEARANCE_INT_DEFAULTS: Dict[str, int] = {
     'table_font_size_px': DEFAULT_TABLE_FONT_SIZE_PX,
     'status_font_size_px': DEFAULT_STATUS_FONT_SIZE_PX,
     'tab_close_font_size_px': DEFAULT_TAB_CLOSE_FONT_SIZE_PX,
-    'toolbar_icon_font_size_px': DEFAULT_TOOLBAR_ICON_FONT_SIZE_PX,
     'body_text_font_size_px': DEFAULT_BODY_TEXT_FONT_SIZE_PX,
     'body_text_font_size_min': DEFAULT_BODY_TEXT_FONT_SIZE_MIN,
     'body_text_font_size_max': DEFAULT_BODY_TEXT_FONT_SIZE_MAX,
@@ -53,7 +51,6 @@ _APPEARANCE_INT_BOUNDS: Dict[str, Tuple[int, int]] = {
     'table_font_size_px': (8, 32),
     'status_font_size_px': (8, 24),
     'tab_close_font_size_px': (8, 24),
-    'toolbar_icon_font_size_px': (8, 28),
     'body_text_font_size_px': (8, 48),
     'body_text_font_size_min': (6, 32),
     'body_text_font_size_max': (8, 72),
