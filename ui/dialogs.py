@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (
 )
 
 from app_info import APP_NAME, APP_VERSION, GITHUB_URL
-from i18n import get_language, list_languages, tr
+from i18n import get_language, list_languages, register_retranslator, tr, unregister_retranslator
 from storage.app_config import get_app_config
 
 from ui.dialog_i18n import translate_button_box
@@ -57,10 +57,22 @@ def _create_form_grid() -> QGridLayout:
     return grid
 
 
-def _add_form_field(grid: QGridLayout, row: int, label_text: str, field: QWidget) -> None:
+def _add_form_field(grid: QGridLayout, row: int, label_text: str, field: QWidget) -> QLabel:
     label = QLabel(label_text)
     grid.addWidget(label, row, 0, Qt.AlignRight | Qt.AlignVCenter)
     grid.addWidget(field, row, 1)
+    return label
+
+
+def _refresh_combo_items(combo: ArrowComboBox, items: list[tuple[str, object]]) -> None:
+    current = combo.currentData()
+    combo.blockSignals(True)
+    combo.clear()
+    for text, data in items:
+        combo.addItem(text, data)
+    if current is not None:
+        _select_combo_by_data(combo, current)
+    combo.blockSignals(False)
 
 
 def _select_combo_by_data(combo: ArrowComboBox, value: str) -> None:
@@ -202,27 +214,27 @@ def prompt_app_settings(
     for theme_name in THEME_OPTIONS:
         theme_combo.addItem(tr(f'theme.{theme_name}'), theme_name)
     theme_combo.setCurrentIndex(THEME_OPTIONS.index(initial.theme))
-    _add_form_field(grid, 0, tr('settings.theme'), theme_combo)
+    theme_label = _add_form_field(grid, 0, tr('settings.theme'), theme_combo)
 
     language_combo = ArrowComboBox()
     language_combo.setMinimumWidth(min_width - 48)
     for info in list_languages():
         language_combo.addItem(info.name, info.code)
     _select_combo_by_data(language_combo, initial.language)
-    _add_form_field(grid, 1, tr('settings.language'), language_combo)
+    language_label = _add_form_field(grid, 1, tr('settings.language'), language_combo)
 
     family_combo = ArrowComboBox()
     family_combo.setMinimumWidth(min_width - 48)
     for family_name in get_app_config().appearance.body_text_font_families:
         family_combo.addItem(family_name)
     _select_body_font_family(family_combo, initial.family)
-    _add_form_field(grid, 2, tr('settings.editor_font_family'), family_combo)
+    family_label = _add_form_field(grid, 2, tr('settings.editor_font_family'), family_combo)
 
     spin = GlyphSpinBox()
     spin.setRange(body_text_font_size_min(), body_text_font_size_max())
     spin.setValue(initial.size)
     spin.setMinimumWidth(120)
-    _add_form_field(grid, 3, tr('settings.editor_font_size'), spin)
+    size_label = _add_form_field(grid, 3, tr('settings.editor_font_size'), spin)
 
     def current_settings() -> AppSettings:
         return AppSettings(
@@ -267,6 +279,25 @@ def prompt_app_settings(
     language_combo.currentIndexChanged.connect(lambda _i: update_apply_enabled())
     family_combo.currentIndexChanged.connect(lambda _i: update_apply_enabled())
     spin.valueChanged.connect(lambda _v: update_apply_enabled())
+
+    def retranslate_settings_dialog() -> None:
+        dialog.setWindowTitle(tr('settings.title'))
+        theme_label.setText(tr('settings.theme'))
+        language_label.setText(tr('settings.language'))
+        family_label.setText(tr('settings.editor_font_family'))
+        size_label.setText(tr('settings.editor_font_size'))
+        _refresh_combo_items(
+            theme_combo,
+            [(tr(f'theme.{theme_name}'), theme_name) for theme_name in THEME_OPTIONS],
+        )
+        _refresh_combo_items(
+            language_combo,
+            [(info.name, info.code) for info in list_languages()],
+        )
+        translate_button_box(buttons)
+
+    register_retranslator(retranslate_settings_dialog)
+    dialog.finished.connect(lambda _result: unregister_retranslator(retranslate_settings_dialog))
 
     theme_combo.setFocus()
 

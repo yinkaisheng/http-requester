@@ -8,6 +8,7 @@ from i18n.translator import (
     register_retranslator,
     set_language,
     tr,
+    unregister_retranslator,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     'register_retranslator',
     'set_language',
     'tr',
+    'unregister_retranslator',
 ]

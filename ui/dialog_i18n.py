@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Optional, Tuple
 
+from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import (
     QApplication,
     QDialog,
@@ -15,33 +16,104 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from i18n import register_retranslator, tr
+from i18n import get_language, register_retranslator, tr
+from i18n.translator import DEFAULT_LOCALE
 
-_DIALOG_BUTTON_BOX_KEYS = {
-    QDialogButtonBox.Ok: 'dialog.ok',
-    QDialogButtonBox.Cancel: 'dialog.cancel',
-    QDialogButtonBox.Apply: 'dialog.apply',
-    QDialogButtonBox.Save: 'dialog.save',
-    QDialogButtonBox.Close: 'dialog.close',
+# (i18n key, label hint for display)
+_DIALOG_BUTTON_BOX_SPECS = {
+    QDialogButtonBox.Ok: ('dialog.ok', 'O'),
+    QDialogButtonBox.Cancel: ('dialog.cancel', 'Esc'),
+    QDialogButtonBox.Apply: ('dialog.apply', 'A'),
+    QDialogButtonBox.Save: ('dialog.save', 'S'),
+    QDialogButtonBox.Close: ('dialog.close', 'Esc'),
 }
 
+_MESSAGE_BOX_BUTTONS = (
+    (QMessageBox.Yes, 'dialog.yes', 'Y'),
+    (QMessageBox.No, 'dialog.no', 'N'),
+    (QMessageBox.Cancel, 'dialog.cancel', 'Esc'),
+    (QMessageBox.Ok, 'dialog.ok', 'O'),
+    (QMessageBox.Apply, 'dialog.apply', 'A'),
+    (QMessageBox.Save, 'dialog.save', 'S'),
+    (QMessageBox.Close, 'dialog.close', 'Esc'),
+)
+
 _FILE_DIALOG_BUTTON_KEYS = {
-    'Open': 'dialog.open',
-    '&Open': 'dialog.open',
-    'Save': 'dialog.save',
-    '&Save': 'dialog.save',
-    'Cancel': 'dialog.cancel',
-    '&Cancel': 'dialog.cancel',
+    'Open': ('dialog.open', 'O'),
+    '&Open': ('dialog.open', 'O'),
+    'Save': ('dialog.save', 'S'),
+    '&Save': ('dialog.save', 'S'),
+    'Cancel': ('dialog.cancel', 'Esc'),
+    '&Cancel': ('dialog.cancel', 'Esc'),
 }
 
 _INSTALLED = False
 
 
+def _use_mnemonic_labels() -> bool:
+    return get_language() == DEFAULT_LOCALE
+
+
+def _insert_mnemonic(base: str, letter: str) -> str:
+    for index, char in enumerate(base):
+        if char.lower() == letter.lower():
+            return f'{base[:index]}&{base[index:]}'
+    return f'&{base}'
+
+
+def _dialog_button_label(i18n_key: str, hint: Optional[str]) -> str:
+    """English: &Yes style mnemonics; other locales: 是(Y) style."""
+    base = tr(i18n_key)
+    if not hint:
+        return base
+    if _use_mnemonic_labels():
+        if hint == 'Esc':
+            return f'{base} (Esc)'
+        if len(hint) == 1:
+            return _insert_mnemonic(base, hint)
+        return f'{base} ({hint})'
+    display = hint.upper() if len(hint) == 1 else hint
+    return f'{base}({display})'
+
+
+def _effective_shortcut(hint: Optional[str]) -> Optional[QKeySequence]:
+    if not hint:
+        return None
+    if hint == 'Esc':
+        return QKeySequence('Esc')
+    if len(hint) == 1:
+        if hint in ('Y', 'N'):
+            return QKeySequence(hint)
+        if _use_mnemonic_labels():
+            return None
+        return QKeySequence(f'Alt+{hint}')
+    return None
+
+
+def _configure_dialog_button(
+    button: QPushButton,
+    i18n_key: str,
+    hint: Optional[str],
+) -> None:
+    button.setText(_dialog_button_label(i18n_key, hint))
+    shortcut = _effective_shortcut(hint)
+    if shortcut is not None:
+        button.setShortcut(shortcut)
+
+
+def _translate_message_box_buttons(box: QMessageBox) -> None:
+    for role, i18n_key, hint in _MESSAGE_BOX_BUTTONS:
+        btn = box.button(role)
+        if btn is None:
+            continue
+        _configure_dialog_button(btn, i18n_key, hint)
+
+
 def translate_button_box(button_box: QDialogButtonBox) -> None:
-    for btn_flag, key in _DIALOG_BUTTON_BOX_KEYS.items():
+    for btn_flag, (i18n_key, hint) in _DIALOG_BUTTON_BOX_SPECS.items():
         btn = button_box.button(btn_flag)
         if btn is not None:
-            btn.setText(tr(key))
+            _configure_dialog_button(btn, i18n_key, hint)
 
 
 def _translate_file_dialog_buttons(dialog: QWidget) -> None:
@@ -50,9 +122,10 @@ def _translate_file_dialog_buttons(dialog: QWidget) -> None:
     for btn in dialog.findChildren(QPushButton):
         raw = btn.text()
         clean = raw.replace('&', '').split('(', 1)[0].strip()
-        key = _FILE_DIALOG_BUTTON_KEYS.get(clean) or _FILE_DIALOG_BUTTON_KEYS.get(raw.replace('&', ''))
-        if key is not None:
-            btn.setText(tr(key))
+        spec = _FILE_DIALOG_BUTTON_KEYS.get(clean) or _FILE_DIALOG_BUTTON_KEYS.get(raw.replace('&', ''))
+        if spec is not None:
+            i18n_key, hint = spec
+            _configure_dialog_button(btn, i18n_key, hint)
 
 
 def _retranslate_open_dialogs() -> None:
@@ -89,22 +162,14 @@ def install_dialog_translations(app=None) -> None:
 
 
 def message_warning(parent: QWidget, title: str, text: str) -> None:
-    box = QMessageBox(parent)
-    box.setIcon(QMessageBox.Warning)
-    box.setWindowTitle(title)
-    box.setText(text)
-    ok_btn = box.addButton(tr('dialog.ok'), QMessageBox.AcceptRole)
-    box.setDefaultButton(ok_btn)
+    box = QMessageBox(QMessageBox.Warning, title, text, QMessageBox.Ok, parent)
+    _translate_message_box_buttons(box)
     box.exec_()
 
 
 def message_info(parent: QWidget, title: str, text: str) -> None:
-    box = QMessageBox(parent)
-    box.setIcon(QMessageBox.Information)
-    box.setWindowTitle(title)
-    box.setText(text)
-    ok_btn = box.addButton(tr('dialog.ok'), QMessageBox.AcceptRole)
-    box.setDefaultButton(ok_btn)
+    box = QMessageBox(QMessageBox.Information, title, text, QMessageBox.Ok, parent)
+    _translate_message_box_buttons(box)
     box.exec_()
 
 
@@ -115,15 +180,11 @@ def ask_yes_no(
     *,
     default: int = QMessageBox.No,
 ) -> bool:
-    box = QMessageBox(parent)
-    box.setIcon(QMessageBox.Question)
-    box.setWindowTitle(title)
-    box.setText(text)
-    yes_btn = box.addButton(tr('dialog.yes'), QMessageBox.YesRole)
-    no_btn = box.addButton(tr('dialog.no'), QMessageBox.NoRole)
-    box.setDefaultButton(yes_btn if default == QMessageBox.Yes else no_btn)
-    box.exec_()
-    return box.clickedButton() == yes_btn
+    box = QMessageBox(QMessageBox.Question, title, text, QMessageBox.NoButton, parent)
+    box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+    _translate_message_box_buttons(box)
+    box.setDefaultButton(QMessageBox.Yes if default == QMessageBox.Yes else QMessageBox.No)
+    return box.exec_() == QMessageBox.Yes
 
 
 def ask_yes_no_cancel(
@@ -133,26 +194,11 @@ def ask_yes_no_cancel(
     *,
     default: int = QMessageBox.Cancel,
 ) -> int:
-    box = QMessageBox(parent)
-    box.setIcon(QMessageBox.Question)
-    box.setWindowTitle(title)
-    box.setText(text)
-    yes_btn = box.addButton(tr('dialog.yes'), QMessageBox.YesRole)
-    no_btn = box.addButton(tr('dialog.no'), QMessageBox.NoRole)
-    cancel_btn = box.addButton(tr('dialog.cancel'), QMessageBox.RejectRole)
-    if default == QMessageBox.Yes:
-        box.setDefaultButton(yes_btn)
-    elif default == QMessageBox.No:
-        box.setDefaultButton(no_btn)
-    else:
-        box.setDefaultButton(cancel_btn)
-    box.exec_()
-    clicked = box.clickedButton()
-    if clicked == yes_btn:
-        return QMessageBox.Yes
-    if clicked == no_btn:
-        return QMessageBox.No
-    return QMessageBox.Cancel
+    box = QMessageBox(QMessageBox.Question, title, text, QMessageBox.NoButton, parent)
+    box.setStandardButtons(QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+    _translate_message_box_buttons(box)
+    box.setDefaultButton(default)
+    return box.exec_()
 
 
 def get_open_file_name(

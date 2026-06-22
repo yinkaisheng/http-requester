@@ -94,6 +94,10 @@ class Translator:
         if callback not in self._retranslators:
             self._retranslators.append(callback)
 
+    def unregister_retranslator(self, callback: Callable[[], None]) -> None:
+        if callback in self._retranslators:
+            self._retranslators.remove(callback)
+
     def notify_retranslate(self) -> None:
         for callback in list(self._retranslators):
             callback()
@@ -189,6 +193,10 @@ def tr(key: str, **kwargs: object) -> str:
 
 def register_retranslator(callback: Callable[[], None]) -> None:
     _get_translator().register_retranslator(callback)
+
+
+def unregister_retranslator(callback: Callable[[], None]) -> None:
+    _get_translator().unregister_retranslator(callback)
 
 
 def list_languages() -> List[LanguageInfo]:
