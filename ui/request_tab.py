@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import json
+import base64
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -15,7 +15,6 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
-    QPlainTextEdit,
     QPushButton,
     QMessageBox,
     QSplitter,
@@ -41,6 +40,7 @@ from services.http_service import send_request
 from services.powershell_export import format_powershell_command
 from storage.history_store import HistoryStore
 from ui.body_editor import BodyEditor
+from ui.response_body_panel import ResponseBodyPanel
 from ui.headers_editor import (
     COPY_CURL_MENU_TEXT,
     COPY_POWERSHELL_MENU_TEXT,
@@ -98,36 +98,8 @@ def _http_worker(signal: pyqtSignal, task_id: int, req: HttpRequest) -> None:
     signal.emit((task_id, MSG_HTTP_DONE, resp))
 
 
-MAX_PRETTY_PRINT_BYTES = 5 * 1024 * 1024  # 5 MB
-
-
-def _is_json_content_type(headers: Dict[str, str]) -> bool:
-    for name, value in headers.items():
-        if name.lower() != 'content-type':
-            continue
-        media_type = value.split(';', 1)[0].strip().lower()
-        if media_type == 'application/json' or media_type.endswith('+json'):
-            return True
-        if media_type == 'text/json':
-            return True
-    return False
-
-
-def _format_response_body_text(resp: HttpResponse) -> str:
-    body_text = resp.body_text()
-    if len(resp.body) > MAX_PRETTY_PRINT_BYTES:
-        return body_text
-    if not _is_json_content_type(resp.headers):
-        return body_text
-    try:
-        parsed = json.loads(body_text)
-        return json.dumps(parsed, ensure_ascii=False, indent=2)
-    except (json.JSONDecodeError, TypeError):
-        return body_text
-
-
 def _response_snapshot(resp: HttpResponse) -> dict:
-    body_text = _format_response_body_text(resp)
+    body_text = resp.body_text()
     stored_body, is_binary = encode_response_body_for_storage(body_text, resp.body)
     return {
         'status_code': resp.status_code,
@@ -233,26 +205,7 @@ class RequestTab(QWidget):
         _set_compact_table_header(self.response_headers_table, header_table=True)
         attach_header_table_menu(self.response_headers_table, key_col=0, value_col=1)
 
-        self.response_body_edit = QPlainTextEdit()
-        self.response_body_edit.setObjectName('bodyTextEdit')
-        self.response_body_edit.setReadOnly(True)
-        self.response_body_edit.setPlaceholderText('Response will appear here')
-
-        response_body_block = QWidget()
-        rb_layout = QVBoxLayout(response_body_block)
-        rb_layout.setContentsMargins(0, 0, 0, 0)
-        rb_layout.setSpacing(4)
-        rb_header_row = QWidget()
-        rb_header_row.setFixedHeight(BodyEditor.section_header_height())
-        rb_header = QHBoxLayout(rb_header_row)
-        rb_header.setContentsMargins(0, 0, 0, 0)
-        rb_title = QLabel('Response Body')
-        rb_title.setObjectName('sectionTitle')
-        rb_title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        rb_header.addWidget(rb_title)
-        rb_header.addStretch()
-        rb_layout.addWidget(rb_header_row)
-        rb_layout.addWidget(self.response_body_edit, 1)
+        self.response_body_panel = ResponseBodyPanel()
 
         response_headers_block = QWidget()
         rh_layout = QVBoxLayout(response_headers_block)
@@ -277,7 +230,7 @@ class RequestTab(QWidget):
         rh_layout.addWidget(self.response_headers_table, 1)
 
         self.right_splitter.addWidget(response_headers_block)
-        self.right_splitter.addWidget(response_body_block)
+        self.right_splitter.addWidget(self.response_body_panel)
         self.right_splitter.setStretchFactor(0, 1)
         self.right_splitter.setStretchFactor(1, 3)
 
@@ -579,7 +532,7 @@ class RequestTab(QWidget):
             self._set_status_text(f'Error: {resp.error}')
             self._set_status_style('statusError')
             self.response_headers_table.setRowCount(0)
-            self.response_body_edit.setPlainText('')
+            self.response_body_panel.clear()
             self._cached_response = None
             return
 
@@ -596,8 +549,11 @@ class RequestTab(QWidget):
         self.response_headers_table.setRowCount(0)
         fill_key_value_table(self.response_headers_table, resp.headers)
 
-        body_text = _format_response_body_text(resp)
-        self.response_body_edit.setPlainText(body_text)
+        self.response_body_panel.set_body(
+            resp.body_text(),
+            resp.headers,
+            raw_bytes=resp.body,
+        )
         if not resp.error or resp.status_code:
             self._cached_response = _response_snapshot(resp)
 
@@ -605,7 +561,7 @@ class RequestTab(QWidget):
         self._set_status_text('Waiting to send request')
         self._set_status_style('statusPending')
         self.response_headers_table.setRowCount(0)
-        self.response_body_edit.setPlainText('')
+        self.response_body_panel.clear()
         self._cached_response = None
 
     def _apply_saved_response(
@@ -635,7 +591,16 @@ class RequestTab(QWidget):
             self._set_status_style('statusPending')
 
         fill_key_value_table(self.response_headers_table, headers)
-        self.response_body_edit.setPlainText(decode_stored_response_body(body or '', body_is_binary))
+        body_text = decode_stored_response_body(body or '', body_is_binary)
+        raw_bytes = b''
+        if body_is_binary and body:
+            try:
+                raw_bytes = base64.b64decode(body)
+            except Exception:
+                raw_bytes = b''
+        elif body_text:
+            raw_bytes = body_text.encode('utf-8')
+        self.response_body_panel.set_body(body_text, headers, raw_bytes=raw_bytes)
 
     def _save_to_history(self, resp: HttpResponse) -> None:
         req = self.collect_request()

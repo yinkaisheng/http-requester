@@ -96,6 +96,7 @@ class HistoryStore:
             'url': record.request.url,
             'created_at': record.created_at,
             'status_code': record.status_code,
+            'status_reason': record.status_reason,
         }
 
     def _record_from_index_entry(self, entry: Dict[str, Any]) -> HistoryRecord:
@@ -109,6 +110,7 @@ class HistoryStore:
             created_at=entry.get('created_at', ''),
             updated_at=entry.get('created_at', ''),
             status_code=entry.get('status_code'),
+            status_reason=entry.get('status_reason', ''),
         )
 
     def load(self) -> List[HistoryRecord]:

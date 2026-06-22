@@ -15,7 +15,7 @@ from ui.dialogs import prompt_text
 from ui.request_tab import RequestTab
 
 TAB_CLOSE_BUTTON_TEXT = '\u00d7'
-TAB_TITLE_MAX_WIDTH = 500
+TAB_TITLE_MAX_WIDTH = 400
 
 
 class RequestTabWidget(QTabWidget):

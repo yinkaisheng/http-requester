@@ -624,6 +624,24 @@ QTableWidget::item:selected:!active, QTableView::item:selected:!active {{
     color: {p.window_fg};
 }}
 
+QTreeWidget {{
+    background-color: {p.window_bg};
+    alternate-background-color: {p.surface};
+    border: none;
+    selection-background-color: {p.hover_bg};
+    selection-color: {p.window_fg};
+    outline: none;
+}}
+
+QTreeWidget::item:selected:!active {{
+    background-color: {p.hover_bg};
+    color: {p.window_fg};
+}}
+
+QTreeWidget::item {{
+    padding: 2px 4px;
+}}
+
 QTableWidget::item {{
     padding: 2px 4px;
 }}
