@@ -17,8 +17,7 @@ if 'python' not in exe_path.name.lower():
 else:
     os.chdir(script_path.parent)
 
-from storage.app_config import init_app_config
-from storage.session_store import SessionStore
+from storage.app_config import get_app_config, init_app_config
 from ui.main_window import MainWindow
 from ui.theme import (
     apply_app_font,
@@ -44,10 +43,10 @@ def run_qt_app():
     icon = _load_app_icon()
     if not icon.isNull():
         app.setWindowIcon(icon)
-    session = SessionStore().load()
-    theme = normalize_theme_name(session.get('theme'))
-    body_text_font_size = normalize_body_text_font_size(session.get('body_text_font_size'))
-    body_text_font_family = normalize_body_text_font_family(session.get('body_text_font_family'))
+    appearance = get_app_config().appearance
+    theme = normalize_theme_name(appearance.theme)
+    body_text_font_size = normalize_body_text_font_size(appearance.body_text_font_size_px)
+    body_text_font_family = normalize_body_text_font_family(appearance.body_text_font_family)
     apply_app_font(app)
     apply_app_theme(app, theme, body_text_font_size, body_text_font_family)
     window = MainWindow()

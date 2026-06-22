@@ -6,11 +6,9 @@ from dataclasses import dataclass
 from typing import Callable, Optional, Tuple
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
-    QFontComboBox,
     QGridLayout,
     QLineEdit,
     QLabel,
@@ -19,15 +17,15 @@ from PyQt5.QtWidgets import (
 )
 
 from app_info import APP_NAME, APP_VERSION, GITHUB_URL
+from storage.app_config import get_app_config
 
-from ui.widgets import ArrowFontComboBox, ArrowComboBox, GlyphSpinBox
+from ui.widgets import ArrowComboBox, GlyphSpinBox
 from ui.theme import (
-    BODY_TEXT_FONT_SIZE_MAX,
-    BODY_TEXT_FONT_SIZE_MIN,
+    body_text_font_size_max,
+    body_text_font_size_min,
     THEME_LABELS,
     THEME_OPTIONS,
     ThemeName,
-    default_body_text_font_family,
     format_link_html,
     normalize_body_text_font_family,
     normalize_theme_name,
@@ -156,16 +154,13 @@ def prompt_bearer_token(
     return token
 
 
-def _select_monospace_family(combo: QFontComboBox, family: str) -> None:
+def _select_body_font_family(combo: ArrowComboBox, family: str) -> None:
     target = normalize_body_text_font_family(family)
-    combo.setCurrentFont(QFont(target))
-    if combo.currentFont().family() == target:
+    index = combo.findText(target)
+    if index >= 0:
+        combo.setCurrentIndex(index)
         return
-    for index in range(combo.count()):
-        if combo.itemText(index) == target:
-            combo.setCurrentIndex(index)
-            return
-    combo.setCurrentFont(QFont(default_body_text_font_family()))
+    combo.setCurrentIndex(0)
 
 
 def prompt_app_settings(
@@ -194,15 +189,15 @@ def prompt_app_settings(
     theme_combo.setCurrentIndex(THEME_OPTIONS.index(initial.theme))
     _add_form_field(grid, 0, 'Theme', theme_combo)
 
-    family_combo = ArrowFontComboBox()
-    family_combo.setEditable(False)
-    family_combo.setFontFilters(QFontComboBox.MonospacedFonts)
+    family_combo = ArrowComboBox()
     family_combo.setMinimumWidth(min_width - 48)
-    _select_monospace_family(family_combo, initial.family)
+    for family_name in get_app_config().appearance.body_text_font_families:
+        family_combo.addItem(family_name)
+    _select_body_font_family(family_combo, initial.family)
     _add_form_field(grid, 1, 'Editor Font Family', family_combo)
 
     spin = GlyphSpinBox()
-    spin.setRange(BODY_TEXT_FONT_SIZE_MIN, BODY_TEXT_FONT_SIZE_MAX)
+    spin.setRange(body_text_font_size_min(), body_text_font_size_max())
     spin.setValue(initial.size)
     spin.setMinimumWidth(120)
     _add_form_field(grid, 2, 'Editor Font Size (px)', spin)
@@ -211,7 +206,7 @@ def prompt_app_settings(
         return AppSettings(
             theme=normalize_theme_name(theme_combo.currentData()),
             size=spin.value(),
-            family=normalize_body_text_font_family(family_combo.currentFont().family()),
+            family=normalize_body_text_font_family(family_combo.currentText()),
         )
 
     buttons = QDialogButtonBox(
@@ -245,7 +240,7 @@ def prompt_app_settings(
     layout.addWidget(buttons)
 
     theme_combo.currentIndexChanged.connect(lambda _i: update_apply_enabled())
-    family_combo.currentFontChanged.connect(lambda _f: update_apply_enabled())
+    family_combo.currentIndexChanged.connect(lambda _i: update_apply_enabled())
     spin.valueChanged.connect(lambda _v: update_apply_enabled())
 
     theme_combo.setFocus()

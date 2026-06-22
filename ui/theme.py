@@ -18,13 +18,6 @@ from ui.theme_defaults import (
     merge_theme_colors,
 )
 
-FONT_SIZE_DELTA_PX = 2
-BODY_TEXT_FONT_DELTA_PX = 4
-BODY_TEXT_FONT_SIZE_MIN = 8
-BODY_TEXT_FONT_SIZE_MAX = 48
-BODY_TEXT_FONT_FAMILY_WIN = 'Consolas'
-BODY_TEXT_FONT_FALLBACKS = ('Cascadia Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace')
-
 ThemeName = Literal['solarized', 'light', 'dark']
 THEME_SOLARIZED: ThemeName = 'solarized'
 THEME_LIGHT: ThemeName = 'light'
@@ -114,51 +107,75 @@ def normalize_theme_name(theme: str | None) -> ThemeName:
     return THEME_SOLARIZED
 
 
+def _appearance():
+    return get_app_config().appearance
+
+
+def body_text_font_size_min() -> int:
+    return _appearance().body_text_font_size_min
+
+
+def body_text_font_size_max() -> int:
+    return _appearance().body_text_font_size_max
+
+
 def default_body_text_font_family() -> str:
-    if sys.platform == 'win32':
-        return BODY_TEXT_FONT_FAMILY_WIN
-    return BODY_TEXT_FONT_FALLBACKS[0]
+    return _appearance().body_text_font_family
 
 
 def normalize_body_text_font_family(value) -> str:
+    appearance = _appearance()
     if isinstance(value, str):
         name = value.strip().replace('"', '')
         if name:
             return name
-    return default_body_text_font_family()
+    return appearance.body_text_font_family
 
 
 def body_text_font_family_css(family: str | None = None) -> str:
+    appearance = _appearance()
     name = normalize_body_text_font_family(family)
     primary = f'"{name}"' if ' ' in name else name
     fallbacks = ', '.join(
         f'"{fallback}"' if ' ' in fallback else fallback
-        for fallback in BODY_TEXT_FONT_FALLBACKS
+        for fallback in appearance.body_text_font_fallbacks
         if fallback != name
     )
     return f'{primary}, {fallbacks}, monospace'
 
 
-def apply_app_font(app: QApplication) -> None:
-    """Apply the app-wide font adjustment once at startup."""
-    base_font = app.font()
-    pixel_size = base_font.pixelSize()
-    if pixel_size > 0:
-        base_font.setPixelSize(pixel_size + FONT_SIZE_DELTA_PX)
+def default_ui_font() -> QFont:
+    """Stable UI font; do not rely on QApplication.font() (can be SimSun 6pt on some setups)."""
+    appearance = _appearance()
+    font = QFont()
+    if sys.platform == 'win32':
+        for family in appearance.ui_font_families_win:
+            candidate = QFont(family)
+            if candidate.exactMatch():
+                font = candidate
+                break
+    elif sys.platform == 'darwin':
+        candidate = QFont('.AppleSystemUIFont')
+        if candidate.exactMatch():
+            font = candidate
     else:
-        base_font.setPointSize(base_font.pointSize() + 1)
-    app.setFont(base_font)
+        font = QFont('Sans Serif')
+    font.setPixelSize(appearance.ui_font_size_px)
+    return font
 
 
-def default_body_text_font_size_px(font: QFont | None = None) -> int:
-    return resolve_ui_font_size_px(font) + BODY_TEXT_FONT_DELTA_PX
+def apply_app_font(app: QApplication) -> None:
+    """Apply the app-wide font once at startup."""
+    app.setFont(default_ui_font())
 
 
-def normalize_body_text_font_size(value, font: QFont | None = None) -> int:
-    default = default_body_text_font_size_px(font)
-    if not isinstance(value, int) or value < BODY_TEXT_FONT_SIZE_MIN or value > BODY_TEXT_FONT_SIZE_MAX:
-        return default
-    return value
+def normalize_body_text_font_size(value) -> int:
+    appearance = _appearance()
+    minimum = appearance.body_text_font_size_min
+    maximum = appearance.body_text_font_size_max
+    if isinstance(value, int) and minimum <= value <= maximum:
+        return value
+    return appearance.body_text_font_size_px
 
 
 def apply_app_theme(
@@ -181,17 +198,16 @@ def apply_app_theme(
     )
 
 
-def resolve_ui_font_size_px(font: QFont | None = None) -> int:
-    """Match the pixel size used by global QSS (*, QComboBox, etc.)."""
-    if font is None:
-        app = QApplication.instance()
-        if app is None:
-            return 13
-        font = app.font()
-    pixel_size = font.pixelSize()
-    if pixel_size > 0:
-        return pixel_size
-    return int(font.pointSize() * 1.33)
+def resolve_ui_font_size_px() -> int:
+    """Pixel size for global QSS and combo popups."""
+    return _appearance().ui_font_size_px
+
+
+def table_font_size_px(*, header_table: bool = False) -> int:
+    appearance = _appearance()
+    if header_table:
+        return appearance.ui_font_size_px
+    return appearance.table_font_size_px
 
 
 def popup_list_font(font: QFont | None = None) -> QFont:
@@ -199,7 +215,7 @@ def popup_list_font(font: QFont | None = None) -> QFont:
     app = QApplication.instance()
     base = font or (app.font() if app is not None else QFont())
     ui_font = QFont(base)
-    ui_font.setPixelSize(resolve_ui_font_size_px(base))
+    ui_font.setPixelSize(resolve_ui_font_size_px())
     return ui_font
 
 
@@ -209,17 +225,18 @@ def _build_stylesheet(
     body_text_font_size: int | None = None,
     body_text_font_family: str | None = None,
 ) -> str:
-    size_px = resolve_ui_font_size_px(font)
+    appearance = _appearance()
+    ui_size_px = appearance.ui_font_size_px
     if body_text_font_size is None:
-        resolved_body_text_font_size = size_px + BODY_TEXT_FONT_DELTA_PX
+        resolved_body_text_font_size = appearance.body_text_font_size_px
     else:
-        resolved_body_text_font_size = normalize_body_text_font_size(body_text_font_size, font)
+        resolved_body_text_font_size = normalize_body_text_font_size(body_text_font_size)
     body_text_font_family = body_text_font_family_css(body_text_font_family)
     ui_font_family = font.family().replace('"', '\\"')
     p = palette
     return f'''
 * {{
-    font-size: {size_px}px;
+    font-size: {ui_size_px}px;
 }}
 
 QMainWindow, QWidget {{
@@ -374,7 +391,7 @@ QPushButton#tabCloseButton {{
     min-height: 18px;
     max-height: 18px;
     border-radius: 3px;
-    font-size: {max(size_px + 1, 12)}px;
+    font-size: {appearance.tab_close_font_size_px}px;
     font-weight: bold;
 }}
 
@@ -431,7 +448,7 @@ QToolButton#settingsButton, QToolButton#aboutButton {{
     max-width: 28px;
     min-height: 24px;
     max-height: 24px;
-    font-size: {max(size_px + 2, 14)}px;
+    font-size: {appearance.toolbar_icon_font_size_px}px;
 }}
 
 QToolButton#settingsButton:hover, QToolButton#aboutButton:hover {{
@@ -475,7 +492,7 @@ QComboBox, QSpinBox {{
     border-radius: 4px;
     padding: 4px 8px;
     font-family: "{ui_font_family}";
-    font-size: {size_px}px;
+    font-size: {ui_size_px}px;
     selection-background-color: {p.highlight};
     selection-color: {p.highlight_text};
 }}
@@ -551,12 +568,12 @@ QComboBox QAbstractItemView, QListView#comboPopupListView {{
     selection-background-color: {p.background_secondary};
     selection-color: {p.text_primary};
     font-family: "{ui_font_family}";
-    font-size: {size_px}px;
+    font-size: {ui_size_px}px;
     outline: none;
 }}
 
 QComboBox QAbstractItemView::item {{
-    min-height: {max(size_px + 8, 22)}px;
+    min-height: {max(ui_size_px + 8, 22)}px;
     padding: 4px 8px;
 }}
 
@@ -792,7 +809,7 @@ QLabel#statusOk {{
     padding: 0;
     margin: 0;
     color: {p.status_success};
-    font-size: {max(size_px - 2, 10)}px;
+    font-size: {appearance.status_font_size_px}px;
     font-weight: normal;
 }}
 
@@ -800,7 +817,7 @@ QLabel#statusWarn {{
     padding: 0;
     margin: 0;
     color: {p.status_warning};
-    font-size: {max(size_px - 2, 10)}px;
+    font-size: {appearance.status_font_size_px}px;
     font-weight: normal;
 }}
 
@@ -808,7 +825,7 @@ QLabel#statusError {{
     padding: 0;
     margin: 0;
     color: {p.status_error};
-    font-size: {max(size_px - 2, 10)}px;
+    font-size: {appearance.status_font_size_px}px;
     font-weight: normal;
 }}
 
@@ -816,7 +833,7 @@ QLabel#statusPending {{
     padding: 0;
     margin: 0;
     color: {p.status_pending};
-    font-size: {max(size_px - 2, 10)}px;
+    font-size: {appearance.status_font_size_px}px;
     font-weight: normal;
 }}
 '''

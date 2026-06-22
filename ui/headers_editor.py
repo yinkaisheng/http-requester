@@ -30,7 +30,7 @@ from models.http_models import HeaderItem, HttpRequest, is_valid_header_name
 from services.curl_import import parse_curl_command
 from services.powershell_import import parse_powershell_command
 from ui.dialogs import prompt_basic_auth, prompt_bearer_token
-from ui.theme import check_mark_color
+from ui.theme import check_mark_color, table_font_size_px
 
 TABLE_HEADER_HEIGHT = 22
 HEADER_ROW_HEIGHT = 24
@@ -38,8 +38,6 @@ HEADER_TABLE_ROW_HEIGHT = HEADER_ROW_HEIGHT - 4
 TABLE_ROW_EXTRA_PADDING = 12
 HEADER_TABLE_ROW_EXTRA_PADDING = 6
 HEADER_TABLE_EDITABLE_MIN_HEIGHT = 24
-TABLE_FONT_DELTA_PX = 1
-HEADER_TABLE_FONT_DELTA_PX = 0
 TOGGLE_CELL_MARGIN_V = 1
 HEADER_TABLE_TOGGLE_SIZE = 16
 
@@ -89,12 +87,7 @@ def parse_headers_text(text: str) -> List[Tuple[str, str]]:
 
 def _apply_header_table_font(table: QTableWidget, *, header_table: bool = False) -> None:
     font = table.font()
-    delta = HEADER_TABLE_FONT_DELTA_PX if header_table else TABLE_FONT_DELTA_PX
-    pixel_size = font.pixelSize()
-    if pixel_size > 0:
-        font.setPixelSize(pixel_size + delta)
-    elif delta:
-        font.setPointSize(font.pointSize() + delta)
+    font.setPixelSize(table_font_size_px(header_table=header_table))
     table.setFont(font)
     table.horizontalHeader().setFont(font)
 

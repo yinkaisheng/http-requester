@@ -77,7 +77,7 @@ Command-line arguments passed to the launcher are forwarded to the Python entry 
 - **Linked names** — renaming a tab or a history entry updates both; custom names persist in history
 - **Multi-tab workspace** — open several requests at once; tabs are closable, draggable, and renameable (right-click tab bar)
 - **Tab ↔ history** — opening history creates a tab if needed; deleting history closes its tab
-- **Session restore** — window layout, theme, splitter sizes, and open tabs persist across restarts
+- **Session restore** — window layout, splitter sizes, and open tabs persist across restarts
 
 ### Import & export
 
@@ -141,8 +141,8 @@ Not every curl or pwsh option is supported (e.g. cookies, proxies, redirects). P
 
 ### UI
 
-- **Settings** — click **⚙** next to **+ New Request** for theme, editor font family/size; **Apply** saves without closing the dialog
-- **Themes** — Solarized Light, Light, and Dark; colors are editable in `config/config.json` under `themes`
+- **Settings** — click **⚙** next to **+ New Request** for theme and editor font; **Apply** saves to `config.json` without closing the dialog
+- **Themes & fonts** — theme colors and UI/body font sizes are in `config/config.json` (`themes`, `appearance`); restart to apply manual edits
 - **Clean UI** — Fusion style with consistent tables, tabs, and context menus
 
 ## Usage
@@ -162,10 +162,10 @@ Local data is stored under `config/` next to the executable (or project root whe
 
 | Path | Purpose |
 |------|---------|
-| `config/config.json` | App tuning and per-theme colors; created automatically on first run if missing |
+| `config/config.json` | App tuning, theme colors, and font/appearance settings |
 | `config/history.json` | History list metadata (id, name, method, URL, status code/reason, time) |
 | `config/records/{id}.json` | Full request/response payload per history entry |
-| `config/session.json` | Theme, font settings, window size, splitter layout, and open tabs |
+| `config/session.json` | Window size, splitter layout, and open tabs |
 
 `config.json` keys:
 
@@ -177,6 +177,7 @@ Local data is stored under `config/` next to the executable (or project root whe
 | `binary_hex_line_width` | `8` | Hex bytes per line in binary preview |
 | `tab_title_max_width` | `400` | Max tab title width in pixels |
 | `themes` | — | Per-theme UI colors (`solarized`, `light`, `dark`); see `THEME_COLOR_DOCS` in `ui/theme_defaults.py` |
+| `appearance` | — | Theme name, UI font sizes, and body editor font (family/size) |
 
 Edit `config/config.json` and restart the app to apply changes.
 

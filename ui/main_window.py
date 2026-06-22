@@ -23,14 +23,13 @@ from pyqt_async_task import AsyncTask
 from storage.history_store import HistoryStore
 from models.http_models import HistoryRecord
 from storage.session_store import SessionStore
+from storage.app_config import get_app_config, save_appearance_settings
 from ui.dialogs import AppSettings, prompt_app_settings, show_about_dialog
 from ui.history_panel import HistoryPanel
 from ui.request_tab import RequestTab, splitter_ratio_to_sizes, splitter_sizes_to_ratio, MSG_HTTP_DONE
 from ui.request_tab_widget import RequestTabWidget
 from ui.theme import (
     apply_app_theme,
-    default_body_text_font_family,
-    default_body_text_font_size_px,
     normalize_body_text_font_family,
     normalize_body_text_font_size,
     normalize_theme_name,
@@ -55,9 +54,6 @@ class MainWindow(QMainWindow):
         self._session_save_timer.timeout.connect(self._save_session)
         self.setWindowTitle('HTTP Requester')
         self._main_splitter: Optional[QSplitter] = None
-        self._body_text_font_size = default_body_text_font_size_px()
-        self._body_text_font_family = default_body_text_font_family()
-        self._theme = normalize_theme_name(None)
         self._init_ui()
         self._connect_signals()
         self._restore_session()
@@ -140,14 +136,12 @@ class MainWindow(QMainWindow):
         self.history_panel.update_record_name(record_id, new_name)
         self.request_tabs.update_tab_title_for_record(record_id, new_name)
 
+    def _appearance(self):
+        return get_app_config().appearance
+
     def _restore_session(self) -> None:
         session = self.session_store.load()
         window = session.get('window', {})
-
-        theme = normalize_theme_name(session.get('theme'))
-        self._theme = theme
-        self._body_text_font_size = normalize_body_text_font_size(session.get('body_text_font_size'))
-        self._body_text_font_family = normalize_body_text_font_family(session.get('body_text_font_family'))
         self._apply_appearance()
 
         width = window.get('width', self.DEFAULT_WIDTH)
@@ -202,9 +196,6 @@ class MainWindow(QMainWindow):
         }
         self.session_store.save({
             'version': 1,
-            'theme': self._current_theme(),
-            'body_text_font_size': self._body_text_font_size,
-            'body_text_font_family': self._body_text_font_family,
             'window': window_state,
             'tabs': tab_state.get('tabs', []),
             'current_tab_index': tab_state.get('current_tab_index', 0),
@@ -218,32 +209,35 @@ class MainWindow(QMainWindow):
         self.request_tabs.new_request()
 
     def _current_theme(self) -> str:
-        return normalize_theme_name(self._theme)
+        return normalize_theme_name(self._appearance().theme)
 
     def _apply_appearance(self) -> None:
         app = QApplication.instance()
         if app is None:
             return
+        appearance = self._appearance()
         apply_app_theme(
             app,
             self._current_theme(),
-            self._body_text_font_size,
-            self._body_text_font_family,
+            normalize_body_text_font_size(appearance.body_text_font_size_px),
+            normalize_body_text_font_family(appearance.body_text_font_family),
         )
 
     def _save_settings(self, settings: AppSettings) -> None:
-        self._theme = settings.theme
-        self._body_text_font_size = settings.size
-        self._body_text_font_family = settings.family
+        save_appearance_settings(
+            theme=settings.theme,
+            body_text_font_family=settings.family,
+            body_text_font_size_px=settings.size,
+        )
         self._apply_appearance()
-        self._save_session()
 
     def _on_settings_clicked(self) -> None:
+        appearance = self._appearance()
         prompt_app_settings(
             self,
             self._current_theme(),
-            self._body_text_font_size,
-            self._body_text_font_family,
+            appearance.body_text_font_size_px,
+            appearance.body_text_font_family,
             on_save=self._save_settings,
         )
 
