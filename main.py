@@ -3,6 +3,7 @@
 import os
 import sys
 from pathlib import Path
+import traceback
 
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QStyleFactory
@@ -13,10 +14,8 @@ exe_path = Path(sys.executable).resolve()
 script_path = Path(__file__).resolve()
 if 'python' not in exe_path.name.lower():
     os.chdir(exe_path.parent) # sys.executable is HttpRequester.exe(Windows) or httpreq(Linux)
-    config_logger(logger, log_dir='logs', log_file='http-requester.log')
 else:
     os.chdir(script_path.parent)
-    config_logger(logger)
 
 from storage.session_store import SessionStore
 from ui.main_window import MainWindow
@@ -37,11 +36,7 @@ def _load_app_icon() -> QIcon:
     return QIcon()
 
 
-def main():
-    logger.info(f'========================================\n\n')
-    logger.info(f'executable={exe_path}, pid={os.getpid()}, working_directory={os.getcwd()}')
-    logger.info(f'__file__={script_path}, argv={sys.argv}')
-    logger.info('sys.path=\n[\n{}\n]'.format('\n'.join(sys.path)))
+def run_qt_app():
     app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create('Fusion'))
     app.setApplicationName('HTTP Requester')
@@ -61,6 +56,25 @@ def main():
         window.setWindowIcon(icon)
     window.show()
     sys.exit(app.exec_())
+
+
+def main():
+    if sys.stdout is None:
+        config_logger(logger, log_dir='logs', log_file='http-requester.log')
+    else:
+        config_logger(logger)
+
+    logger.info(f'========================================\n\n')
+    logger.info(f'executable={exe_path}, pid={os.getpid()}, working_directory={os.getcwd()}')
+    logger.info(f'__file__={script_path}, argv={sys.argv}')
+    logger.info('sys.path=\n[\n{}\n]'.format('\n'.join(sys.path)))
+
+    try:
+        run_qt_app()
+    except Exception as ex:
+        logger.error(f'An unexpected error occurred:\n'
+                     f'{"".join(traceback.format_exception(type(ex), ex, ex.__traceback__))}')
+        sys.exit(1)
 
 
 if __name__ == '__main__':
