@@ -84,9 +84,22 @@ class BodyEditor(QWidget):
         self.radio_json.setText(tr('body.json'))
         self.radio_form.setText(tr('body.form_data'))
         self.radio_file.setText(tr('body.file_upload'))
+        self.text_edit.setPlaceholderText(tr('body.text_placeholder'))
+        self.form_table.setHorizontalHeaderLabels([
+            tr('body.form_key'), tr('body.form_value'),
+            tr('body.form_file'), tr('body.form_path'),
+        ])
         self._form_add_btn.setText(tr('body.add'))
         self._form_remove_btn.setText(tr('body.remove'))
+        self._file_label.setText(tr('body.file_label'))
+        self.file_path_edit.setPlaceholderText(tr('body.file_placeholder'))
         self._browse_btn.setText(tr('body.choose_file'))
+        for row in range(self.form_table.rowCount()):
+            widget = self.form_table.cellWidget(row, 2)
+            if widget:
+                btn = widget.findChild(QPushButton)
+                if btn:
+                    btn.setText(tr('body.yes') if btn.isChecked() else tr('body.no'))
 
     def _build_header_row(self) -> QWidget:
         row = QWidget()
@@ -153,7 +166,8 @@ class BodyEditor(QWidget):
         page_layout.setContentsMargins(0, 0, 0, 0)
 
         file_layout = QHBoxLayout()
-        file_layout.addWidget(QLabel(tr('body.file_label')))
+        self._file_label = QLabel(tr('body.file_label'))
+        file_layout.addWidget(self._file_label)
         self.file_path_edit = QLineEdit()
         self.file_path_edit.setReadOnly(True)
         self.file_path_edit.setPlaceholderText(tr('body.file_placeholder'))
