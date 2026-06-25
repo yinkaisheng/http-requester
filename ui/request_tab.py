@@ -619,7 +619,7 @@ class RequestTab(QWidget):
         body_is_binary: bool = False,
     ) -> None:
         headers = headers or {}
-        if status_code is None and not headers and not body:
+        if status_code is None and not headers and not body and not reason:
             self._clear_response_display()
             return
 
@@ -632,8 +632,12 @@ class RequestTab(QWidget):
             self._set_status_text(status_text)
             self._set_status_style(style_id)
         else:
-            self._set_status_text(tr('request.saved_response'))
-            self._set_status_style('statusPending')
+            if reason:
+                self._set_status_text(reason)
+                self._set_status_style('statusError')
+            else:
+                self._set_status_text(tr('request.saved_response'))
+                self._set_status_style('statusPending')
 
         fill_key_value_table(self.response_headers_table, headers)
         body_text = decode_stored_response_body(body or '', body_is_binary)
@@ -661,6 +665,7 @@ class RequestTab(QWidget):
             record.name = self._draft_name.strip()
         if resp.error and not resp.status_code:
             record.error = resp.error
+            record.status_reason = resp.error
         elif not resp.error or resp.status_code:
             snapshot = _response_snapshot(resp)
             record.status_code = snapshot['status_code']
