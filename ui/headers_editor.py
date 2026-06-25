@@ -282,9 +282,9 @@ class HeaderTableInteraction(QObject):
             if (
                 key_event.key() == Qt.Key_V
                 and key_event.modifiers() & Qt.ControlModifier
-                and self._paste_callback is not None
+                and (self._paste_callback is not None or self._paste_request_callback is not None)
             ):
-                if self._paste_headers():
+                if self._paste_auto_detect():
                     return True
             if key_event.key() == Qt.Key_Delete and self._delete_rows_callback is not None:
                 rows = _selected_rows(table)
@@ -327,6 +327,34 @@ class HeaderTableInteraction(QObject):
             if parsed:
                 self._paste_callback(parsed)
                 return True
+        except RuntimeError:
+            self._on_table_destroyed()
+        return False
+
+    def _paste_auto_detect(self) -> bool:
+        if not self._is_active():
+            return False
+        table = self._table
+        try:
+            if table.state() == QAbstractItemView.EditingState:
+                return False
+            text = QApplication.clipboard().text()
+            # Try curl first, then powershell, fall back to plain headers
+            if self._paste_request_callback is not None:
+                req = parse_curl_command(text)
+                if req is not None:
+                    self._paste_request_callback(req)
+                    return True
+                req = parse_powershell_command(text)
+                if req is not None:
+                    self._paste_request_callback(req)
+                    return True
+            # Fall back to header paste
+            if self._paste_callback is not None:
+                parsed = parse_headers_text(text)
+                if parsed:
+                    self._paste_callback(parsed)
+                    return True
         except RuntimeError:
             self._on_table_destroyed()
         return False
