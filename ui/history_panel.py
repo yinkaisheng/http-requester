@@ -9,6 +9,7 @@ from PyQt5.QtGui import QFontMetrics, QMouseEvent, QResizeEvent
 from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMenu,
@@ -49,7 +50,7 @@ class HistoryItemWidget(QWidget):
         self.label.setCursor(Qt.PointingHandCursor)
         layout.addWidget(self.label, 1)
 
-        self.delete_btn = QPushButton('×')
+        self.delete_btn = QPushButton('×') # not x
         self.delete_btn.setObjectName('historyDeleteButton')
         self.delete_btn.setFixedSize(DELETE_BUTTON_WIDTH, DELETE_BUTTON_WIDTH)
         self.delete_btn.setToolTip(tr('history.delete_tooltip'))
@@ -110,7 +111,27 @@ class HistoryPanel(QWidget):
 
         self._title_label = QLabel(tr('history.title'))
         self._title_label.setObjectName('panelTitle')
-        layout.addWidget(self._title_label)
+
+        title_layout = QHBoxLayout()
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        title_layout.addWidget(self._title_label)
+        title_layout.addStretch()
+
+        self._filter_edit = QLineEdit()
+        self._filter_edit.setObjectName('historyFilterEdit')
+        self._filter_edit.setPlaceholderText(tr('history.filter_placeholder'))
+        self._filter_edit.setClearButtonEnabled(False)
+        self._filter_edit.textChanged.connect(self._filter_changed)
+        title_layout.addWidget(self._filter_edit, 0, Qt.AlignVCenter)
+
+        self._clear_filter_btn = QPushButton('×') # not x
+        self._clear_filter_btn.setObjectName('historyClearFilterButton')
+        self._clear_filter_btn.setMaximumWidth(36)
+        self._clear_filter_btn.setToolTip(tr('history.clear_filter_tooltip'))
+        self._clear_filter_btn.clicked.connect(self._clear_filter)
+        title_layout.addWidget(self._clear_filter_btn, 0, Qt.AlignVCenter)
+
+        layout.addLayout(title_layout)
 
         self.list_widget = QListWidget()
         self.list_widget.setSpacing(0)
@@ -121,6 +142,8 @@ class HistoryPanel(QWidget):
 
     def retranslate_ui(self) -> None:
         self._title_label.setText(tr('history.title'))
+        self._filter_edit.setPlaceholderText(tr('history.filter_placeholder'))
+        self._clear_filter_btn.setToolTip(tr('history.clear_filter_tooltip'))
         for widget in self._item_widgets.values():
             widget.delete_btn.setToolTip(tr('history.delete_tooltip'))
 
@@ -138,6 +161,10 @@ class HistoryPanel(QWidget):
         self._item_widgets.clear()
         for record in self._records:
             self._add_record_item(record)
+        # Re-apply current filter text
+        current_text = self._filter_edit.text()
+        if current_text:
+            self._filter_changed(current_text)
 
     def prepend_record(self, record: HistoryRecord) -> None:
         self._records = [r for r in self._records if r.id != record.id]
@@ -159,6 +186,10 @@ class HistoryPanel(QWidget):
         self.list_widget.insertItem(0, item)
         self.list_widget.setItemWidget(item, widget)
         self._item_widgets[record.id] = widget
+        # Apply current filter to the new item
+        filter_text = self._filter_edit.text().strip().lower()
+        if filter_text and filter_text not in record.list_text().lower():
+            item.setHidden(True)
         self.select_record(record.id)
 
     def select_record(self, record_id: Optional[str]) -> None:
@@ -182,6 +213,21 @@ class HistoryPanel(QWidget):
                 if widget is not None:
                     widget.set_full_text(record.list_text())
                 return
+
+    def _filter_changed(self, text: str) -> None:
+        text = text.strip().lower()
+        for index in range(self.list_widget.count()):
+            item = self.list_widget.item(index)
+            if item is None:
+                continue
+            record_id = item.data(Qt.UserRole)
+            widget = self._item_widgets.get(record_id)
+            if widget:
+                matches = not text or text in widget.full_text().lower()
+                item.setHidden(not matches)
+
+    def _clear_filter(self) -> None:
+        self._filter_edit.clear()
 
     def _add_record_item(self, record: HistoryRecord) -> None:
         item = QListWidgetItem()

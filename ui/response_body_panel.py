@@ -387,10 +387,14 @@ class ResponseBodyPanel(QWidget):
         self._original_pixmap = None
         self._image_page.set_pixmap(None)
         self._image_page.setToolTip('')
-        self.radio_raw.setChecked(True)
         self._hide_string_detail()
         self.save_raw_btn.setVisible(self._has_body())
         self._set_view_enabled()
+        # Auto-switch to JSON view if body is JSON and within format limit
+        if self.radio_json.isEnabled() and not self._exceeds_json_format_limit():
+            self.radio_json.setChecked(True)
+        else:
+            self.radio_raw.setChecked(True)
         if self._is_image:
             self._load_image()
         self._apply_current_view()

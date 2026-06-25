@@ -91,6 +91,8 @@ BUILTIN_STRINGS: Dict[str, str] = {
     'tab.rename_label': 'Request name:',
     'history.delete_tooltip': 'Delete',
     'history.title': 'History',
+    'history.filter_placeholder': 'Filter...',
+    'history.clear_filter_tooltip': 'Clear filter',
     'history.delete': 'Delete',
     'history.delete_others': 'Delete Others Except This',
     'history.delete_same': 'Delete Same Method && URL Except This',
