@@ -19,7 +19,6 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QSplitter,
     QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -55,6 +54,7 @@ from ui.headers_editor import (
 )
 from i18n import tr
 from ui.dialog_i18n import ask_yes_no_cancel, message_warning
+from ui.params_dialog import prompt_url_params
 from ui.widgets import AccentCheckBox, ArrowComboBox, GlyphSpinBox
 
 MSG_HTTP_DONE = 1
@@ -180,6 +180,15 @@ class RequestTab(QWidget):
         toolbar.addWidget(self.method_combo, 0, Qt.AlignVCenter)
         toolbar.addWidget(self.ssl_verify_check, 0, Qt.AlignVCenter)
         toolbar.addWidget(self.url_edit, 1, Qt.AlignVCenter)
+
+        self.params_btn = QPushButton('P')
+        self.params_btn.setObjectName('paramsButton')
+        self.params_btn.setFixedWidth(32)
+        self.params_btn.setFlat(True)
+        self.params_btn.setToolTip(tr('url_params.btn_tooltip'))
+        self.params_btn.clicked.connect(self._on_params_clicked)
+        toolbar.addWidget(self.params_btn, 0, Qt.AlignVCenter)
+
         toolbar.addWidget(timeout_row, 0, Qt.AlignVCenter)
         toolbar.addWidget(self.send_btn, 0, Qt.AlignVCenter)
         toolbar.addWidget(self.curl_btn, 0, Qt.AlignVCenter)
@@ -255,6 +264,7 @@ class RequestTab(QWidget):
         self.send_btn.setText(tr('request.send'))
         self.curl_btn.setToolTip(tr('menu.copy_curl'))
         self.pwsh_btn.setToolTip(tr('menu.copy_powershell'))
+        self.params_btn.setToolTip(tr('url_params.btn_tooltip'))
         self._rh_title.setText(tr('request.response_headers'))
         self.response_headers_table.setHorizontalHeaderLabels(header_table_labels())
         self.headers_panel.retranslate_ui()
@@ -497,6 +507,9 @@ class RequestTab(QWidget):
         command = format_powershell_command(self.collect_request())
         if command:
             QApplication.clipboard().setText(command, QClipboard.Clipboard)
+
+    def _on_params_clicked(self) -> None:
+        prompt_url_params(self, self.url_edit.text(), self.url_edit.setText)
 
     def _apply_imported_request(self, req: HttpRequest) -> None:
         self.load_request(req)

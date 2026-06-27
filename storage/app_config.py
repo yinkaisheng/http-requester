@@ -366,38 +366,3 @@ def save_app_preferences(
     _raw_config_cache = data
     _config_cache = _to_app_config(data)
     return _config_cache
-
-
-def save_appearance_settings(
-    *,
-    theme: str,
-    body_text_font_family: str,
-    body_text_font_size_px: int,
-    path: Path = CONFIG_FILE,
-) -> AppearanceConfig:
-    """Persist appearance choices to config.json and refresh the in-memory cache."""
-    global _config_cache, _raw_config_cache
-    cfg = get_app_config()
-    current = cfg.appearance
-    appearance = _normalize_appearance({
-        'theme': theme,
-        'ui_font_size_px': current.ui_font_size_px,
-        'table_font_size_px': current.table_font_size_px,
-        'status_font_size_px': current.status_font_size_px,
-        'tab_close_font_size_px': current.tab_close_font_size_px,
-        'ui_font_families_win': list(current.ui_font_families_win),
-        'body_text_font_family': body_text_font_family,
-        'body_text_font_size_px': body_text_font_size_px,
-        'body_text_font_size_min': current.body_text_font_size_min,
-        'body_text_font_size_max': current.body_text_font_size_max,
-        'body_text_font_families': list(current.body_text_font_families),
-        'body_text_font_fallbacks': list(current.body_text_font_fallbacks),
-    })
-    if _raw_config_cache is None:
-        _raw_config_cache = _normalize_config(_default_config())
-    data = dict(_raw_config_cache)
-    data['appearance'] = appearance
-    _save_config(path, data)
-    _raw_config_cache = data
-    _config_cache = _to_app_config(data)
-    return _config_cache.appearance

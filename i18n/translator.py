@@ -22,8 +22,6 @@ Required files per language directory:
   language.ini   display name for Settings (see Languages/en/language.ini)
   strings.txt    UTF-8 plain text, one ``key=value`` per line (# comments allowed)
 
-  strings.txt    UTF-8 plain text, one ``key=value`` per line (# comments allowed)
-
   Literal braces in text (no placeholders): write ``{Key}`` as-is.
   Only escape as ``{{Key}}`` when the string uses ``tr('key', name=...)`` and
   you need a literal ``{`` after ``.format()`` runs.
@@ -136,8 +134,6 @@ def _parse_strings_file(path) -> Dict[str, str]:
 
 
 def _read_language_name(code: str) -> str:
-    if code == DEFAULT_LOCALE:
-        return BUILTIN_STRINGS.get('language.en', 'English')
     meta_path = LANGUAGES_DIR / code / LANGUAGE_META_FILE
     if meta_path.is_file():
         parser = ConfigParser()
@@ -146,6 +142,8 @@ def _read_language_name(code: str) -> str:
             name = parser.get('language', 'name').strip()
             if name:
                 return name
+    if code == DEFAULT_LOCALE:
+        return BUILTIN_STRINGS.get('language.en', 'English')
     return code
 
 

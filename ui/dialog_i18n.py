@@ -212,7 +212,7 @@ def get_open_file_name(
     if dialog.exec_() == QDialog.Accepted:
         files = dialog.selectedFiles()
         if files:
-            return files[0], file_filter
+            return files[0], dialog.selectedNameFilter()
     return '', file_filter
 
 
@@ -229,5 +229,5 @@ def get_save_file_name(
     if dialog.exec_() == QDialog.Accepted:
         files = dialog.selectedFiles()
         if files:
-            return files[0], file_filter
+            return files[0], dialog.selectedNameFilter()
     return '', file_filter
