@@ -16,7 +16,6 @@ from PyQt5.QtWidgets import (
     QShortcut,
     QSplitter,
     QStackedWidget,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -80,16 +79,14 @@ class MainWindow(QMainWindow):
         self.new_btn.clicked.connect(self._on_new_request)
         top_layout.addWidget(self.new_btn, 0, Qt.AlignVCenter)
 
-        self.settings_btn = QToolButton()
+        self.settings_btn = QPushButton('\u2699')
         self.settings_btn.setObjectName('settingsButton')
-        self.settings_btn.setText('\u2699')
         self.settings_btn.setToolTip(tr('main.settings_tooltip'))
         self.settings_btn.clicked.connect(self._on_settings_clicked)
         top_layout.addWidget(self.settings_btn, 0, Qt.AlignVCenter)
 
-        self.about_btn = QToolButton()
+        self.about_btn = QPushButton('\u24D8')
         self.about_btn.setObjectName('aboutButton')
-        self.about_btn.setText('\u24D8')
         self.about_btn.setToolTip(tr('main.about_tooltip'))
         self.about_btn.clicked.connect(self._on_about_clicked)
         top_layout.addWidget(self.about_btn, 0, Qt.AlignVCenter)

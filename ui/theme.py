@@ -464,22 +464,23 @@ QPushButton#primaryButton:pressed {{
     background-color: {p.highlight_pressed};
 }}
 
-QToolButton#settingsButton, QToolButton#aboutButton {{
+QPushButton#settingsButton, QPushButton#aboutButton {{
     background-color: {p.background_secondary};
     border: 1px solid {p.border};
     border-radius: 4px;
     color: {p.text_primary};
     padding: 5px 8px;
-    min-width: 0;
+    min-width: 24px;
+    max-width: 24px;
     min-height: 0;
 }}
 
-QToolButton#settingsButton:hover, QToolButton#aboutButton:hover {{
+QPushButton#settingsButton:hover, QPushButton#aboutButton:hover {{
     background-color: {p.background_hover};
     border-color: {p.border_emphasis};
 }}
 
-QToolButton#settingsButton:pressed, QToolButton#aboutButton:pressed {{
+QPushButton#settingsButton:pressed, QPushButton#aboutButton:pressed {{
     background-color: {p.background_row_stripe};
 }}
 
