@@ -109,13 +109,9 @@ class HistoryPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
 
-        self._title_label = QLabel(tr('history.title'))
-        self._title_label.setObjectName('panelTitle')
-
         title_layout = QHBoxLayout()
         title_layout.setContentsMargins(0, 0, 0, 0)
-        title_layout.addWidget(self._title_label)
-        title_layout.addStretch()
+        title_layout.setSpacing(4)
 
         self._filter_edit = QLineEdit()
         self._filter_edit.setObjectName('historyFilterEdit')
@@ -130,6 +126,7 @@ class HistoryPanel(QWidget):
         self._clear_filter_btn.setToolTip(tr('history.clear_filter_tooltip'))
         self._clear_filter_btn.clicked.connect(self._clear_filter)
         title_layout.addWidget(self._clear_filter_btn, 0, Qt.AlignVCenter)
+        title_layout.addStretch()  # push filter group to the left
 
         layout.addLayout(title_layout)
 
@@ -141,7 +138,6 @@ class HistoryPanel(QWidget):
         layout.addWidget(self.list_widget)
 
     def retranslate_ui(self) -> None:
-        self._title_label.setText(tr('history.title'))
         self._filter_edit.setPlaceholderText(tr('history.filter_placeholder'))
         self._clear_filter_btn.setToolTip(tr('history.clear_filter_tooltip'))
         for widget in self._item_widgets.values():

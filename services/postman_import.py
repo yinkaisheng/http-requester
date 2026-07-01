@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from models.collection_models import Collection, CollectionItem
+from models.favorite_models import FavoriteItem
 from models.http_models import (
     BodyType,
     FormField,
@@ -23,46 +23,50 @@ from models.http_models import (
 )
 
 
-def parse_postman_collection_file(file_path: str) -> Collection:
-    """Read a Postman Collection JSON file and return a ``Collection``."""
+def parse_postman_collection_file(file_path: str) -> List[FavoriteItem]:
+    """Read a Postman Collection JSON file and return a list of root
+    |FavoriteItem| nodes (the first one is a folder holding the
+    collection)."""
     with open(file_path, 'r', encoding='utf-8') as f:
         text = f.read()
     return parse_postman_collection_text(text)
 
 
-def parse_postman_collection_text(text: str) -> Collection:
-    """Parse a Postman Collection JSON string into a ``Collection``."""
+def parse_postman_collection_text(text: str) -> List[FavoriteItem]:
+    """Parse a Postman Collection JSON string into a list of root
+    |FavoriteItem| nodes."""
     data = json.loads(text)
     info = data.get('info', {})
     name = info.get('name', 'Imported Collection')
     items = data.get('item', [])
-    return Collection(
+    root = FavoriteItem(
         name=name,
-        items=[_parse_item(item) for item in items],
+        children=[_parse_item(item) for item in items],
     )
+    return [root]
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _parse_item(item_data: Dict[str, Any]) -> CollectionItem:
+def _parse_item(item_data: Dict[str, Any]) -> FavoriteItem:
     """Recursively parse a Postman item (folder or request)."""
     name = item_data.get('name', '')
 
     # Folder: has an "item" array
     if 'item' in item_data:
         children = [_parse_item(child) for child in item_data['item']]
-        return CollectionItem(name=name, children=children)
+        return FavoriteItem(name=name, children=children)
 
     # Request leaf: has a "request" object
     request_data = item_data.get('request')
     if request_data:
         request = _parse_request(request_data)
-        return CollectionItem(name=name, request=request)
+        return FavoriteItem(name=name, request=request)
 
     # Unknown shape — return a bare folder
-    return CollectionItem(name=name)
+    return FavoriteItem(name=name)
 
 
 def _parse_request(request_data: Dict[str, Any]) -> HttpRequest:

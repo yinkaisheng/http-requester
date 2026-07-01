@@ -667,15 +667,20 @@ class RequestTab(QWidget):
     def _save_to_history(self, resp: HttpResponse) -> None:
         req = self.collect_request()
         now = datetime.now(timezone.utc).isoformat()
+        # Preserve the existing tab name (set from favorites tree or history)
+        existing_name = ''
+        if self._record and self._record.name.strip():
+            existing_name = self._record.name.strip()
+        elif self._draft_name.strip():
+            existing_name = self._draft_name.strip()
         record = HistoryRecord(
             id=str(uuid.uuid4()),
+            name=existing_name,
             request=req,
             sent_headers=self.headers_panel.get_sent_headers(),
             created_at=now,
             updated_at=now,
         )
-        if self._draft_name.strip():
-            record.name = self._draft_name.strip()
         if resp.error and not resp.status_code:
             record.error = resp.error
             record.status_reason = resp.error

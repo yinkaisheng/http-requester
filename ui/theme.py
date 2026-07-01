@@ -618,15 +618,11 @@ QTableWidget::item:selected:!active, QTableView::item:selected:!active {{
 QTreeWidget {{
     background-color: {p.background_primary};
     alternate-background-color: {p.tree_row_stripe_background};
-    border: none;
+    border: 1px solid {p.border};
+    border-radius: 4px;
     selection-background-color: {p.tree_selected_background};
     selection-color: {p.text_primary};
     outline: none;
-}}
-
-QTreeWidget::item:selected:!active {{
-    background-color: {p.tree_selected_background};
-    color: {p.text_primary};
 }}
 
 QTreeWidget::item {{

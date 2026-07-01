@@ -145,6 +145,16 @@ Not every curl or pwsh option is supported (e.g. cookies, proxies, redirects). P
 - **Themes & fonts** — theme colors and UI/body font sizes are in `config/config.json` (`themes`, `appearance`); restart to apply manual edits
 - **Clean UI** — Fusion style with consistent tables, tabs, and context menus
 
+### Favorites
+
+- **Tree view** — organize requests into folders and favorites (leaf nodes with a saved request)
+- **Drag-drop** — two modes: drag over the **icon area** (left of the item text) to insert as a **sibling** with a blue indicator line; drag over the **text area** to use Qt's native InternalMove (drop on a folder to add as child, drop between items to insert as sibling)
+- **Filter** — inline filter box above the tree; type to filter items in real time; click **×** to clear
+- **Right-click** — add folders/favorites, rename, delete (leaf nodes skip confirmation; non-empty folders confirm)
+- **Keyboard** — `F2` to rename, `Delete` to delete the selected item
+- **Import Postman** — import a Postman collection v2.0/v2.1 JSON file as a folder tree
+- **Open from tree** — double-click a favorite to open it in a new tab; the tab keeps the tree item's name even after sending the request
+
 ## Usage
 
 1. Click **+ New Request** to open a tab.
@@ -165,7 +175,8 @@ Local data is stored under `config/` next to the executable (or project root whe
 | `config/config.json` | App tuning, theme colors, and font/appearance settings |
 | `config/history.json` | History list metadata (id, name, method, URL, status code/reason, time) |
 | `config/records/{id}.json` | Full request/response payload per history entry |
-| `config/session.json` | Window size, splitter layout, and open tabs |
+| `config/session.json` | Window size, splitter layout, open tabs, and active side panel |
+| `config/favorites.json` | Favorites tree (folders and request items) |
 
 `config.json` keys:
 

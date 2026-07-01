@@ -22,12 +22,12 @@ from PyQt5.QtWidgets import (
 )
 
 from pyqt_async_task import AsyncTask
-from storage.collection_store import CollectionStore
+from storage.favorite_store import FavoriteStore
 from storage.history_store import HistoryStore
 from models.http_models import HistoryRecord, HttpRequest
 from storage.session_store import SessionStore
 from storage.app_config import get_app_config, save_app_preferences
-from ui.collection_panel import CollectionPanel
+from ui.favorite_panel import FavoritePanel
 from ui.dialogs import AppSettings, prompt_app_settings, show_about_dialog
 from ui.history_panel import HistoryPanel
 from ui.request_tab import RequestTab, splitter_ratio_to_sizes, splitter_sizes_to_ratio, MSG_HTTP_DONE
@@ -49,7 +49,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.history_store = HistoryStore()
-        self.collection_store = CollectionStore()
+        self.favorite_store = FavoriteStore()
         self.session_store = SessionStore()
         self.async_task = AsyncTask()
         self.async_task.debugPrint = False
@@ -97,7 +97,7 @@ class MainWindow(QMainWindow):
 
         self._main_splitter = QSplitter(Qt.Horizontal)
         self.history_panel = HistoryPanel(self.history_store)
-        self.collection_panel = CollectionPanel(self.collection_store, self._get_current_request)
+        self.favorite_panel = FavoritePanel(self.favorite_store, self._get_current_request)
         self.request_tabs = RequestTabWidget(self.history_store, self.async_task)
 
         left_container = QWidget()
@@ -109,25 +109,25 @@ class MainWindow(QMainWindow):
         # Mode selector: [History] [Collections] toggle buttons
         self._side_stack = QStackedWidget()
         self._side_stack.addWidget(self.history_panel)      # page 0
-        self._side_stack.addWidget(self.collection_panel)   # page 1
+        self._side_stack.addWidget(self.favorite_panel)   # page 1
 
         mode_row = QWidget()
         mode_layout = QHBoxLayout(mode_row)
         mode_layout.setContentsMargins(8, 0, 8, 0)
         mode_layout.setSpacing(0)
         self.side_mode_group = QButtonGroup(self)
-        self.history_tab_btn = QPushButton(tr('collections.history_tab'))
-        self.collections_tab_btn = QPushButton(tr('collections.collections_tab'))
-        for btn in (self.history_tab_btn, self.collections_tab_btn):
+        self.history_tab_btn = QPushButton(tr('history.history_tab'))
+        self.favorites_tab_btn = QPushButton(tr('favorites.favorite_tab'))
+        for btn in (self.history_tab_btn, self.favorites_tab_btn):
             btn.setObjectName('headerModeButton')
             btn.setCheckable(True)
             btn.setFlat(True)
             self.side_mode_group.addButton(btn)
         self.history_tab_btn.setChecked(True)
         self.history_tab_btn.clicked.connect(lambda: self._switch_side_panel('history'))
-        self.collections_tab_btn.clicked.connect(lambda: self._switch_side_panel('collections'))
+        self.favorites_tab_btn.clicked.connect(lambda: self._switch_side_panel('favorites'))
         mode_layout.addWidget(self.history_tab_btn, 0, Qt.AlignVCenter)
-        mode_layout.addWidget(self.collections_tab_btn, 0, Qt.AlignVCenter)
+        mode_layout.addWidget(self.favorites_tab_btn, 0, Qt.AlignVCenter)
         mode_layout.addStretch()
         left_layout.addWidget(mode_row, 0)
         left_layout.addWidget(self._side_stack, 1)
@@ -154,8 +154,8 @@ class MainWindow(QMainWindow):
         self.history_panel.record_deleted.connect(self.request_tabs.close_record_tab)
         self.history_panel.records_bulk_deleted.connect(self.request_tabs.close_record_tabs)
         self.history_panel.record_renamed.connect(self._on_record_renamed)
-        self.collection_panel.request_selected.connect(self._on_collection_request_selected)
-        self.collection_panel.collections_changed.connect(self._schedule_session_save)
+        self.favorite_panel.request_selected.connect(self._on_favorite_request_selected)
+        self.favorite_panel.favorites_changed.connect(self._schedule_session_save)
         self.request_tabs.record_renamed.connect(self._on_record_renamed)
         self.request_tabs.record_saved.connect(self._on_record_saved)
         self.request_tabs.currentChanged.connect(self._on_current_tab_changed)
@@ -205,6 +205,13 @@ class MainWindow(QMainWindow):
             self.request_tabs.new_request()
         self._on_current_tab_changed(self.request_tabs.currentIndex())
 
+        # Restore side panel
+        side_panel = session.get('side_panel', 0)
+        if isinstance(side_panel, int) and side_panel == 1:
+            self._switch_side_panel('favorites')
+        else:
+            self._switch_side_panel('history')
+
     def _center_on_screen(self) -> None:
         screen = QApplication.primaryScreen()
         if not screen:
@@ -239,6 +246,7 @@ class MainWindow(QMainWindow):
             'window': window_state,
             'tabs': tab_state.get('tabs', []),
             'current_tab_index': tab_state.get('current_tab_index', 0),
+            'side_panel': self._side_stack.currentIndex(),
         })
 
     def closeEvent(self, event: 'QCloseEvent') -> None:
@@ -250,10 +258,10 @@ class MainWindow(QMainWindow):
         self.new_btn.setText(tr('main.new_request'))
         self.settings_btn.setToolTip(tr('main.settings_tooltip'))
         self.about_btn.setToolTip(tr('main.about_tooltip'))
-        self.history_tab_btn.setText(tr('collections.history_tab'))
-        self.collections_tab_btn.setText(tr('collections.collections_tab'))
+        self.history_tab_btn.setText(tr('history.history_tab'))
+        self.favorites_tab_btn.setText(tr('favorites.favorite_tab'))
         self.history_panel.retranslate_ui()
-        self.collection_panel.retranslate_ui()
+        self.favorite_panel.retranslate_ui()
         self.request_tabs.retranslate_ui()
 
     def _on_new_request(self) -> None:
@@ -310,9 +318,9 @@ class MainWindow(QMainWindow):
         self.history_panel.prepend_record(record)
 
     def _switch_side_panel(self, mode: str) -> None:
-        if mode == 'collections':
-            self._side_stack.setCurrentWidget(self.collection_panel)
-            self.collections_tab_btn.setChecked(True)
+        if mode == 'favorites':
+            self._side_stack.setCurrentWidget(self.favorite_panel)
+            self.favorites_tab_btn.setChecked(True)
         else:
             self._side_stack.setCurrentWidget(self.history_panel)
             self.history_tab_btn.setChecked(True)
@@ -325,6 +333,6 @@ class MainWindow(QMainWindow):
                 return req
         return None
 
-    def _on_collection_request_selected(self, request: HttpRequest, name: str) -> None:
+    def _on_favorite_request_selected(self, request: HttpRequest, name: str) -> None:
         record = HistoryRecord(name=name, request=request)
         self.request_tabs.open_record(record)
