@@ -3,6 +3,8 @@
 """Favorites sidebar panel — tree of API request groups."""
 from __future__ import annotations
 
+import json
+import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -10,6 +12,7 @@ from PyQt5.QtCore import QPoint, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QPainter, QPen, QPixmap, QDrag
 from PyQt5.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QFileDialog,
     QHBoxLayout,
     QLineEdit,
@@ -59,6 +62,9 @@ class _FavoriteTreeWidget(QTreeWidget):
 
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
+        # ---- unique tree id for cut/paste clipboard check ----
+        self._tree_id = uuid.uuid4().hex
+
         # ---- drag-drop configuration ----
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
@@ -276,6 +282,44 @@ class _FavoriteTreeWidget(QTreeWidget):
         self.viewport().update()
 
     # ------------------------------------------------------------------
+    #  Cut / paste helpers
+    # ------------------------------------------------------------------
+
+    @property
+    def tree_id(self) -> str:
+        return self._tree_id
+
+    def get_item_path(self, item: QTreeWidgetItem) -> List[int]:
+        """Return the index-path from root to *item*: ``[top_idx, …, child_idx]``."""
+        path: List[int] = []
+        node: Optional[QTreeWidgetItem] = item
+        while node is not None:
+            parent = node.parent()
+            if parent:
+                path.append(parent.indexOfChild(node))
+            else:
+                path.append(self.indexOfTopLevelItem(node))
+            node = parent
+        path.reverse()
+        return path
+
+    def get_item_by_path(self, path: List[int]) -> Optional[QTreeWidgetItem]:
+        """Return the |QTreeWidgetItem| at *path*, or ``None`` if invalid."""
+        node: Optional[QTreeWidgetItem] = None
+        for idx in path:
+            if node is None:
+                if 0 <= idx < self.topLevelItemCount():
+                    node = self.topLevelItem(idx)
+                else:
+                    return None
+            else:
+                if 0 <= idx < node.childCount():
+                    node = node.child(idx)
+                else:
+                    return None
+        return node
+
+    # ------------------------------------------------------------------
     #  Keyboard shortcuts
     # ------------------------------------------------------------------
 
@@ -440,7 +484,7 @@ class FavoritePanel(QWidget):
         self.tree.itemDoubleClicked.connect(self._on_item_double_clicked)
         self.tree.itemMoved.connect(self._on_tree_item_moved)
         self.tree.renameRequested.connect(self._rename_item)
-        self.tree.deleteRequested.connect(self._delete_item)
+        self.tree.deleteRequested.connect(lambda item: self._delete_item(item, confirm=True))
         self.tree.setAnimated(True)
         self.tree.setIndentation(16)
         # Apply global UI font
@@ -568,6 +612,11 @@ class FavoritePanel(QWidget):
     # ------------------------------------------------------------------
 
     def _on_tree_item_moved(self, _item: QTreeWidgetItem) -> None:
+        # Drag-drop invalidates any stored cut-path, so clear the
+        # cut-state clipboard to prevent pasting to a wrong location.
+        clip_text = QApplication.clipboard().text()
+        if clip_text.startswith(f'internal_move_tree_item_{self.tree.tree_id}='):
+            QApplication.clipboard().clear()
         self._sync_data_model()
         self.favorites_changed.emit()
 
@@ -593,6 +642,12 @@ class FavoritePanel(QWidget):
             menu.addSeparator()
             import_action = menu.addAction(tr('favorites.import_postman'))
 
+            has_items = self.tree.topLevelItemCount() > 0
+            if has_items:
+                menu.addSeparator()
+                expand_all_action = menu.addAction(tr('favorites.expand_all'))
+                collapse_all_action = menu.addAction(tr('favorites.collapse_all'))
+
             action = menu.exec_(self.tree.viewport().mapToGlobal(pos))
             if action == add_folder:
                 self._add_top_level_folder()
@@ -600,6 +655,11 @@ class FavoritePanel(QWidget):
                 self._add_favorite_to_parent(None)
             elif action == import_action:
                 self._import_postman()
+            elif has_items:
+                if action == expand_all_action:
+                    self._expand_all()
+                elif action == collapse_all_action:
+                    self._collapse_all()
             return
 
         # Right-click on an existing item
@@ -618,9 +678,36 @@ class FavoritePanel(QWidget):
             menu.addSeparator()
         menu.addAction(tr('favorites.rename'))
         menu.addAction(tr('favorites.delete'))
+        menu.addSeparator()
+
+        # Cut — available for every item
+        cut_action = menu.addAction(tr('favorites.cut'))
+
+        # Paste — only shown on folder nodes when clipboard has a valid cut item
+        paste_action = None
+        clip_text = QApplication.clipboard().text()
+        prefix = f'internal_move_tree_item_{self.tree.tree_id}='
+        if clip_text.startswith(prefix) and is_folder:
+            try:
+                source_path = json.loads(clip_text[len(prefix):])
+                source_item = self.tree.get_item_by_path(source_path)
+                paste_action = menu.addAction(tr('favorites.paste'))
+                # Disable when target is source itself, or a descendant of source
+                if source_item is None or source_item is item or self.tree._is_descendant_of(item, source_item):
+                    paste_action.setEnabled(False)
+            except (json.JSONDecodeError, TypeError):
+                pass
 
         action = menu.exec_(self.tree.viewport().mapToGlobal(pos))
         if action is None:
+            return
+
+        # Check cut/paste actions by reference first
+        if action == cut_action:
+            self._cut_item(item)
+            return
+        if paste_action is not None and action == paste_action:
+            self._paste_item(item)
             return
 
         action_text = action.text()
@@ -637,7 +724,7 @@ class FavoritePanel(QWidget):
             elif action_text == tr('favorites.rename'):
                 self._rename_item(item)
             elif action_text == tr('favorites.delete'):
-                self._delete_item(item)
+                self._delete_item(item, confirm=False)
         else:
             if action_text == tr('favorites.open'):
                 self._on_item_double_clicked(item, 0)
@@ -646,7 +733,7 @@ class FavoritePanel(QWidget):
             elif action_text == tr('favorites.rename'):
                 self._rename_item(item)
             elif action_text == tr('favorites.delete'):
-                self._delete_item(item)
+                self._delete_item(item, confirm=False)
 
     @staticmethod
     def _is_folder(item: QTreeWidgetItem) -> bool:
@@ -669,6 +756,14 @@ class FavoritePanel(QWidget):
             child = item.child(i)
             if self._is_folder(child):
                 self._collapse_recursive(child)
+
+    def _expand_all(self) -> None:
+        for i in range(self.tree.topLevelItemCount()):
+            self._expand_recursive(self.tree.topLevelItem(i))
+
+    def _collapse_all(self) -> None:
+        for i in range(self.tree.topLevelItemCount()):
+            self._collapse_recursive(self.tree.topLevelItem(i))
 
     # ------------------------------------------------------------------
     #  Tree operations
@@ -757,18 +852,33 @@ class FavoritePanel(QWidget):
         self._sync_data_model()
         self.favorites_changed.emit()
 
-    def _delete_item(self, item: QTreeWidgetItem) -> None:
+    def _delete_item(self, item: QTreeWidgetItem, confirm: bool = False) -> None:
+        """Delete *item* from the tree.
+
+        *confirm* controls whether a confirmation dialog is shown:
+        - ``True``  → always confirm (used by Delete-key shortcut)
+        - ``False`` → only confirm for non-empty folders (used by context menu)
+        """
         fav = self._find_fav_by_tree(item)
         if fav is None:
             return
-        # Only confirm for non-empty folders
-        if fav.is_folder() and fav.children:
+        if confirm:
+            # Delete key — always ask
             if not ask_yes_no(
                 self,
                 tr('favorites.confirm_delete'),
                 tr('favorites.confirm_delete_body', name=item.text(0)),
             ):
                 return
+        else:
+            # Context menu — only confirm for non-empty folders
+            if fav.is_folder() and fav.children:
+                if not ask_yes_no(
+                    self,
+                    tr('favorites.confirm_delete'),
+                    tr('favorites.confirm_delete_body', name=item.text(0)),
+                ):
+                    return
         parent = item.parent()
         if parent:
             parent.removeChild(item)
@@ -776,6 +886,59 @@ class FavoritePanel(QWidget):
             self.tree.takeTopLevelItem(self.tree.indexOfTopLevelItem(item))
         self._sync_data_model()
         self.favorites_changed.emit()
+
+    # ------------------------------------------------------------------
+    #  Cut / paste — move any node via clipboard (handy beyond viewport)
+    # ------------------------------------------------------------------
+
+    def _cut_item(self, item: QTreeWidgetItem) -> None:
+        """Copy the index-path of *item* to the system clipboard for later paste."""
+        path = self.tree.get_item_path(item)
+        clip_text = f'internal_move_tree_item_{self.tree.tree_id}={json.dumps(path)}'
+        QApplication.clipboard().setText(clip_text)
+
+    def _paste_item(self, target_folder: QTreeWidgetItem) -> None:
+        """Move the previously cut node into *target_folder*."""
+        clip_text = QApplication.clipboard().text()
+        prefix = f'internal_move_tree_item_{self.tree.tree_id}='
+        if not clip_text.startswith(prefix):
+            return
+        try:
+            source_path = json.loads(clip_text[len(prefix):])
+        except (json.JSONDecodeError, TypeError):
+            return
+
+        source_item = self.tree.get_item_by_path(source_path)
+        if source_item is None or target_folder is None:
+            return
+        # Disallowed: target is source itself, or target is a descendant of source
+        if source_item is target_folder or self.tree._is_descendant_of(target_folder, source_item):
+            return
+
+        # Preserve expanded states before removing
+        expanded_states = self.tree._collect_expanded(source_item)
+
+        # Remove source from current position
+        parent = source_item.parent()
+        if parent:
+            idx = parent.indexOfChild(source_item)
+            moved = parent.takeChild(idx)
+        else:
+            idx = self.tree.indexOfTopLevelItem(source_item)
+            moved = self.tree.takeTopLevelItem(idx)
+        if moved is None:
+            moved = source_item
+
+        # Insert as child of target folder (at end)
+        target_folder.addChild(moved)
+        target_folder.setExpanded(True)
+
+        # Restore expanded states
+        self.tree._restore_expanded_map(moved, expanded_states)
+
+        self._sync_data_model()
+        self.favorites_changed.emit()
+        self.tree.setCurrentItem(moved)
 
     # ------------------------------------------------------------------
     #  Real-time filter

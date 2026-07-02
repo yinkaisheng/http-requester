@@ -175,6 +175,8 @@ BUILTIN_STRINGS: Dict[str, str] = {
     'favorites.update_from_current': 'Update from Current Tab',
     'favorites.rename': 'Rename',
     'favorites.delete': 'Delete',
+    'favorites.cut': 'Cut',
+    'favorites.paste': 'Paste',
     'favorites.open': 'Open',
     'favorites.import_postman': 'Import Postman Collection...',
     'favorites.confirm_delete': 'Delete',
