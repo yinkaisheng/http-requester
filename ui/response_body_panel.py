@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, Optional
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QClipboard, QPainter, QPixmap
 from PyQt5.QtWidgets import (
     QApplication,
@@ -296,6 +296,9 @@ class ResponseBodyPanel(QWidget):
         self._image_page.setMinimumSize(0, 0)
         self.stack.addWidget(self._image_page)
 
+        # Saved tree state for seamless view switching
+        self._saved_tree_state: Optional[dict] = None
+
         self.view_group.buttonClicked.connect(self._on_view_changed)
 
     def _build_header_row(self) -> QWidget:
@@ -418,6 +421,16 @@ class ResponseBodyPanel(QWidget):
         self.stack.setCurrentIndex(0)
 
     def _on_view_changed(self) -> None:
+        # Save JSON Tree state BEFORE _hide_string_detail destroys it
+        if self.stack.currentIndex() == 1:  # currently on tree page
+            self._saved_tree_state = {
+                'expanded': self._collect_expanded_paths(self.json_tree),
+                'selected': self._selected_item_path(self.json_tree),
+                'detail': self.string_detail.isVisible(),
+                'splitter': self._tree_splitter.sizes(),
+            }
+        # NOTE: do NOT clear _saved_tree_state here — it is consumed
+        # inside _refresh_json_tree (called from _apply_current_view).
         self._hide_string_detail()
         view_id = self.view_group.checkedId()
         if view_id in (_VIEW_JSON, _VIEW_JSON_TREE) and self._exceeds_json_format_limit():
@@ -446,6 +459,21 @@ class ResponseBodyPanel(QWidget):
         self._refresh_json_tree()
 
     def _refresh_json_tree(self) -> None:
+        # Use pre-saved state (from _on_view_changed) so switching
+        # views back-and-forth restores the exact expanded paths,
+        # selected item, detail visibility, and splitter ratio.
+        if self._saved_tree_state is not None:
+            expanded_paths = self._saved_tree_state['expanded']
+            selected_path = self._saved_tree_state['selected']
+            had_detail = self._saved_tree_state['detail']
+            splitter_sizes = self._saved_tree_state['splitter']
+            self._saved_tree_state = None
+        else:
+            expanded_paths = set()
+            selected_path = None
+            had_detail = False
+            splitter_sizes = []
+
         self.json_tree.clear()
         self._hide_string_detail()
         if not self._raw_body.strip():
@@ -455,11 +483,124 @@ class ResponseBodyPanel(QWidget):
         try:
             parsed = json.loads(self._raw_body)
         except (json.JSONDecodeError, TypeError):
-            error_item = QTreeWidgetItem(self.json_tree, [tr('response.tree_invalid_json'), tr('response.tree_invalid_json_value')])
+            error_item = QTreeWidgetItem(
+                self.json_tree,
+                [tr('response.tree_invalid_json'), tr('response.tree_invalid_json_value')],
+            )
             error_item.setData(0, Qt.UserRole, 'error')
             return
         _populate_json_tree(self.json_tree, parsed)
-        self.json_tree.expandToDepth(1)
+
+        # Defer state restoration so the tree layout settles after
+        # population — prevents visual glitches with expand/select.
+        if expanded_paths or selected_path or had_detail or splitter_sizes:
+            QTimer.singleShot(0, lambda ep=expanded_paths, sp=selected_path,
+                              hd=had_detail, ss=splitter_sizes:
+                              self._deferred_restore(ep, sp, hd, ss))
+        else:
+            self.json_tree.expandToDepth(1)
+
+    def _deferred_restore(
+        self,
+        expanded_paths,
+        selected_path,
+        had_detail: bool,
+        splitter_sizes,
+    ) -> None:
+        """Restore expanded/selected/detail/splitter state after rebuild."""
+        if expanded_paths:
+            self._restore_expanded_paths(self.json_tree, expanded_paths)
+        else:
+            self.json_tree.expandToDepth(1)
+
+        if selected_path:
+            self._select_item_by_path(self.json_tree, selected_path)
+
+        if had_detail:
+            selected = self.json_tree.selectedItems()
+            if selected and selected[0].data(0, Qt.UserRole) == 'string':
+                text = selected[0].data(1, Qt.UserRole)
+                if isinstance(text, str):
+                    self.string_detail.setPlainText(text)
+                    self.string_detail.setVisible(True)
+
+        if splitter_sizes and len(splitter_sizes) == 2:
+            self._tree_splitter.setSizes(splitter_sizes)
+
+    @staticmethod
+    def _collect_expanded_paths(tree: QTreeWidget) -> set:
+        """Collect paths of expanded items as ``key/key/…`` strings."""
+        paths: set = set()
+
+        def walk(item: QTreeWidgetItem, prefix: str = '') -> None:
+            key = item.text(0)
+            path = f'{prefix}/{key}' if prefix else key
+            if item.isExpanded():
+                paths.add(path)
+            for i in range(item.childCount()):
+                walk(item.child(i), path)
+
+        for i in range(tree.topLevelItemCount()):
+            walk(tree.topLevelItem(i))
+        return paths
+
+    @staticmethod
+    def _restore_expanded_paths(tree: QTreeWidget, paths: set) -> None:
+        """Restore expanded state from a previously-collected path set."""
+
+        def walk(item: QTreeWidgetItem, prefix: str = '') -> None:
+            key = item.text(0)
+            path = f'{prefix}/{key}' if prefix else key
+            if path in paths:
+                item.setExpanded(True)
+            for i in range(item.childCount()):
+                walk(item.child(i), path)
+
+        for i in range(tree.topLevelItemCount()):
+            walk(tree.topLevelItem(i))
+
+    @staticmethod
+    def _selected_item_path(tree: QTreeWidget) -> Optional[str]:
+        """Return the ``key/key/…`` path of the selected item, or ``None``."""
+        selected = tree.selectedItems()
+        if not selected:
+            return None
+        item = selected[0]
+        parts: list = []
+        while item is not None:
+            parts.append(item.text(0))
+            item = item.parent()
+        parts.reverse()
+        return '/'.join(parts)
+
+    @staticmethod
+    def _select_item_by_path(tree: QTreeWidget, path: str) -> None:
+        """Select the item matching *path*, if it still exists."""
+        if not path:
+            return
+        parts = path.split('/')
+
+        def _walk(parent: QTreeWidgetItem, depth: int):
+            for i in range(parent.childCount()):
+                child = parent.child(i)
+                if child.text(0) == parts[depth]:
+                    if depth == len(parts) - 1:
+                        return child
+                    found = _walk(child, depth + 1)
+                    if found:
+                        return found
+            return None
+
+        for i in range(tree.topLevelItemCount()):
+            item = tree.topLevelItem(i)
+            if item.text(0) == parts[0]:
+                if len(parts) == 1:
+                    tree.setCurrentItem(item)
+                    return
+                found = _walk(item, 1)
+                if found:
+                    tree.setCurrentItem(found)
+                    return
 
     def _load_image(self) -> None:
         pixmap = QPixmap()

@@ -217,6 +217,7 @@ class RequestTab(QWidget):
         self.response_headers_table.setHorizontalHeaderLabels(header_table_labels())
         self.response_headers_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.response_headers_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.response_headers_table.horizontalHeader().setHighlightSections(False)
         self.response_headers_table.verticalHeader().setVisible(False)
         self.response_headers_table.setEditTriggers(QTableWidget.NoEditTriggers)
         _set_compact_table_header(self.response_headers_table, header_table=True)

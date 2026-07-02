@@ -609,12 +609,9 @@ QTableWidget, QTableView {{
     border-radius: 4px;
     selection-background-color: {p.table_selected_background};
     selection-color: {p.text_primary};
+    outline: none;
 }}
 
-QTableWidget::item:selected:!active, QTableView::item:selected:!active {{
-    background-color: {p.table_selected_background};
-    color: {p.text_primary};
-}}
 
 QTreeWidget {{
     background-color: {p.background_primary};
@@ -632,10 +629,32 @@ QTreeWidget::item {{
 
 QTableWidget::item {{
     padding: 2px 4px;
+    border: none;
+    outline: none;
+}}
+
+QTableWidget::item:selected,
+QTableWidget::item:selected:!active {{
+    padding: 2px 4px;
+    border: none;
+    outline: none;
+    background-color: {p.table_selected_background};
+    color: {p.text_primary};
 }}
 
 QTableWidget#headerTable::item {{
     padding: 1px 4px;
+    border: none;
+    outline: none;
+}}
+
+QTableWidget#headerTable::item:selected,
+QTableWidget#headerTable::item:selected:!active {{
+    padding: 1px 4px;
+    border: none;
+    outline: none;
+    background-color: {p.table_selected_background};
+    color: {p.text_primary};
 }}
 
 QTableWidget QLineEdit#tableCellEditor {{
