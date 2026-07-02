@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional, Tuple
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFontDatabase
 from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -225,8 +226,19 @@ def prompt_app_settings(
 
     family_combo = ArrowComboBox()
     family_combo.setMinimumWidth(min_width - 48)
-    for family_name in get_app_config().appearance.body_text_font_families:
-        family_combo.addItem(family_name)
+    # Enumerate all system monospace fonts; put configured preferences first
+    db = QFontDatabase()
+    system_families = set(db.families())
+    preferred = get_app_config().appearance.body_text_font_families
+    seen: set = set()
+    for family_name in preferred:
+        if family_name not in seen and family_name in system_families:
+            family_combo.addItem(family_name)
+            seen.add(family_name)
+    for family_name in db.families():
+        if family_name not in seen and db.isFixedPitch(family_name):
+            family_combo.addItem(family_name)
+            seen.add(family_name)
     _select_body_font_family(family_combo, initial.family)
     family_label = _add_form_field(grid, 2, tr('settings.editor_font_family'), family_combo)
 
