@@ -8,7 +8,7 @@ I wanted a simple tool to send and inspect HTTP requests without installing the 
 
 ## Screenshot
 
-![HTTP Requester screenshot](images/screenshot.png)
+![HTTP Requester screenshot](images/screenshot.gif)
 
 ## Requirements
 
