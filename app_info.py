@@ -3,5 +3,5 @@
 from __future__ import annotations
 
 APP_NAME = 'HTTP Requester'
-APP_VERSION = '20260624'
+APP_VERSION = '20260702'
 GITHUB_URL = 'https://github.com/yinkaisheng/http-requester'
