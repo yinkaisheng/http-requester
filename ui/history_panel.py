@@ -254,8 +254,8 @@ class HistoryPanel(QWidget):
         rename_action = menu.addAction(tr('tab.rename'))
         delete_action = menu.addAction(tr('history.delete'))
         menu.addSeparator()
-        delete_others_action = menu.addAction(tr('history.delete_others'))
         delete_same_action = menu.addAction(tr('history.delete_same'))
+        delete_others_action = menu.addAction(tr('history.delete_others'))
         delete_all_action = menu.addAction(tr('history.delete_all'))
         action = menu.exec_(self.list_widget.mapToGlobal(pos))
 
