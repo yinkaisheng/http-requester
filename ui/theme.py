@@ -252,7 +252,6 @@ QMenuBar {{
 
 QMenuBar::item:selected {{
     background-color: {p.border};
-    border-radius: 3px;
 }}
 
 QMenu {{
@@ -264,7 +263,6 @@ QMenu {{
 QMenu::item {{
     color: {p.text_primary};
     padding: 5px 28px 5px 12px;
-    border-radius: 3px;
 }}
 
 QMenu::item:disabled {{
@@ -313,7 +311,6 @@ QSplitter#contentSplitter::handle:horizontal:hover {{
 
 QTabWidget::pane {{
     border: 1px solid {p.border};
-    border-radius: 4px;
     background-color: {p.background_primary};
     top: -1px;
 }}
@@ -323,8 +320,6 @@ QTabBar::tab {{
     color: {p.text_secondary};
     border: 1px solid {p.border};
     border-bottom: none;
-    border-top-left-radius: 4px;
-    border-top-right-radius: 4px;
     padding: 6px 14px;
     margin-right: 2px;
     min-width: 80px;
@@ -380,7 +375,6 @@ QPushButton#headerModeButton:hover {{
 QPushButton#compactButton {{
     background-color: {p.background_secondary};
     border: 1px solid {p.border};
-    border-radius: 4px;
     padding: 0px 10px;
     min-height: 0px;
     margin: 0;
@@ -417,7 +411,6 @@ QPushButton#tabCloseButton {{
     max-width: 18px;
     min-height: 18px;
     max-height: 18px;
-    border-radius: 3px;
     font-size: {appearance.tab_close_font_size_px}px;
     font-weight: bold;
 }}
@@ -431,7 +424,6 @@ QPushButton {{
     background-color: {p.background_secondary};
     color: {p.text_primary};
     border: 1px solid {p.border};
-    border-radius: 4px;
     padding: 5px 12px;
     min-height: 20px;
 }}
@@ -467,7 +459,6 @@ QPushButton#primaryButton:pressed {{
 QPushButton#settingsButton, QPushButton#aboutButton {{
     background-color: {p.background_secondary};
     border: 1px solid {p.border};
-    border-radius: 4px;
     color: {p.text_primary};
     padding: 5px 8px;
     min-width: 24px;
@@ -491,7 +482,6 @@ QPushButton#historyDeleteButton {{
     padding: 2px 6px;
     min-width: 22px;
     max-width: 22px;
-    border-radius: 3px;
 }}
 
 QPushButton#historyDeleteButton:hover {{
@@ -503,7 +493,6 @@ QLineEdit, QPlainTextEdit {{
     background-color: {p.background_primary};
     color: {p.text_primary};
     border: 1px solid {p.border};
-    border-radius: 4px;
     padding: 4px 8px;
     selection-background-color: {p.highlight};
     selection-color: {p.highlight_text};
@@ -513,7 +502,6 @@ QComboBox, QSpinBox {{
     background-color: {p.background_primary};
     color: {p.text_primary};
     border: 1px solid {p.border};
-    border-radius: 4px;
     padding: 4px 8px;
     font-family: "{ui_font_family}";
     font-size: {ui_size_px}px;
@@ -544,8 +532,6 @@ QComboBox::drop-down {{
     width: 26px;
     border: none;
     border-left: 1px solid {p.border};
-    border-top-right-radius: 3px;
-    border-bottom-right-radius: 3px;
     background-color: {p.background_secondary};
 }}
 
@@ -570,7 +556,6 @@ QSpinBox::up-button, QSpinBox::down-button {{
 QSpinBox::up-button {{
     subcontrol-position: top right;
     border-bottom: 1px solid {p.border};
-    border-top-right-radius: 3px;
 }}
 
 QSpinBox::up-button:hover {{
@@ -579,7 +564,6 @@ QSpinBox::up-button:hover {{
 
 QSpinBox::down-button {{
     subcontrol-position: bottom right;
-    border-bottom-right-radius: 3px;
 }}
 
 QSpinBox::down-button:hover {{
@@ -606,7 +590,6 @@ QTableWidget, QTableView {{
     alternate-background-color: {p.background_row_stripe};
     gridline-color: {p.table_grid};
     border: 1px solid {p.border};
-    border-radius: 4px;
     selection-background-color: {p.table_selected_background};
     selection-color: {p.text_primary};
     outline: none;
@@ -617,7 +600,6 @@ QTreeWidget {{
     background-color: {p.background_primary};
     alternate-background-color: {p.tree_row_stripe_background};
     border: 1px solid {p.border};
-    border-radius: 4px;
     selection-background-color: {p.tree_selected_background};
     selection-color: {p.text_primary};
     outline: none;
@@ -684,7 +666,6 @@ QHeaderView::horizontal {{
 QListWidget {{
     background-color: {p.background_primary};
     border: 1px solid {p.border};
-    border-radius: 4px;
     outline: none;
 }}
 
@@ -704,12 +685,10 @@ QListWidget::item:hover {{
 QScrollBar:vertical {{
     background: {p.background_secondary};
     width: 10px;
-    border-radius: 5px;
 }}
 
 QScrollBar::handle:vertical {{
     background: {p.border};
-    border-radius: 5px;
     min-height: 24px;
 }}
 
@@ -720,12 +699,10 @@ QScrollBar::handle:vertical:hover {{
 QScrollBar:horizontal {{
     background: {p.background_secondary};
     height: 10px;
-    border-radius: 5px;
 }}
 
 QScrollBar::handle:horizontal {{
     background: {p.border};
-    border-radius: 5px;
     min-width: 24px;
 }}
 
@@ -737,7 +714,6 @@ QScrollBar::add-line, QScrollBar::sub-line {{
 QPushButton#checkMarkToggle {{
     background-color: {p.background_primary};
     border: 1px solid {p.border};
-    border-radius: 3px;
     padding: 0;
     min-width: 18px;
     max-width: 18px;
@@ -769,7 +745,6 @@ QCheckBox#sslVerifyCheck::indicator {{
     width: 18px;
     height: 18px;
     border: 1px solid {p.border};
-    border-radius: 3px;
     background-color: {p.background_primary};
 }}
 
@@ -792,7 +767,6 @@ QCheckBox#sslVerifyCheck::indicator:checked:hover {{
 QPushButton#checkMarkToggleCompact {{
     background-color: {p.background_primary};
     border: 1px solid {p.border};
-    border-radius: 3px;
     padding: 0;
     min-width: 16px;
     max-width: 16px;
