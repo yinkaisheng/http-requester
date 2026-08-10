@@ -8,8 +8,8 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from PyQt5.QtCore import QPoint, Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QColor, QFont, QPainter, QPen, QPixmap, QDrag
+from PyQt5.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap, QDrag
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMenu,
     QPushButton,
+    QToolTip,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -78,6 +79,28 @@ class _FavoriteTreeWidget(QTreeWidget):
         self._sibling_above = True
 
         # ---- empty-state hint (drawn in paintEvent) ----
+
+    def viewportEvent(self, event):
+        """Show the complete name only when the tree elides its text."""
+        if event.type() == QEvent.ToolTip:
+            item = self.itemAt(event.pos())
+            if item is not None:
+                item_rect = self.visualItemRect(item)
+                text = item.text(0)
+                text_width = QFontMetrics(item.font(0)).horizontalAdvance(text)
+                depth = 1
+                parent = item.parent()
+                while parent is not None:
+                    depth += 1
+                    parent = parent.parent()
+                available_width = item_rect.width() - depth * self.indentation()
+                if text_width > available_width:
+                    QToolTip.showText(event.globalPos(), text, self.viewport(), item_rect)
+                    return True
+            QToolTip.hideText()
+            event.ignore()
+            return True
+        return super().viewportEvent(event)
 
     # ------------------------------------------------------------------
     #  Drag appearance — semi-transparent drag item
