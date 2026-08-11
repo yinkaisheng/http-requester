@@ -406,7 +406,7 @@ QPushButton#tabCloseButton {{
     background-color: transparent;
     border: none;
     color: {p.text_secondary};
-    padding: 0;
+    padding: -2 0 2 0;
     min-width: 18px;
     max-width: 18px;
     min-height: 18px;
