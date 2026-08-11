@@ -8,7 +8,7 @@ I wanted a simple tool to send and inspect HTTP requests without installing the 
 
 ## Screenshot
 
-![HTTP Requester screenshot](images/screenshot.gif)
+![HTTP Requester screenshot](images/screenshot.png)
 
 ## Requirements
 
@@ -65,7 +65,7 @@ Command-line arguments passed to the launcher are forwarded to the Python entry 
 - **Options** — configurable timeout and SSL certificate verification
 - **Response view** — status line and response headers
 - **Response body** — **Raw**, **JSON** (pretty-print), and **JSON Tree** views; tree nodes support expand/collapse and copy (key, value, JSON fragment); **Save Raw** exports the full body to disk
-- **Binary & image bodies** — `image/*` responses show an inline preview; other binary bodies show a hex dump in Raw (offset, hex bytes, ASCII column) for the first 10 KB, with the remainder summarized; use **Save Raw** for the complete file
+- **Binary & image bodies** — `image/*` responses show an inline preview fitted to its container. Click an image to focus it; use `Ctrl+0` to fit, `Ctrl+1` for original size, `Ctrl+2` for 2× size, `Ctrl+=` / `Ctrl+_` or the mouse wheel to zoom. Oversized images provide scrollbars and drag-to-pan. Other binary bodies show a hex dump in Raw (offset, hex bytes, ASCII column) for the first 10 KB, with the remainder summarized; use **Save Raw** for the complete file
 - **Large JSON** — bodies over 5 MB skip JSON formatting and tree building; choosing JSON views shows a non-modal system notification and falls back to Raw
 - **Non-blocking UI** — requests run in background threads
 - **HTTP logging** — each request logs URL, headers, response, and errors to the console / log file

@@ -62,6 +62,15 @@ BUILTIN_STRINGS: Dict[str, str] = {
     'response.json': 'JSON',
     'response.json_tree': 'JSON Tree',
     'response.placeholder': 'Response will appear here',
+    'response.image_tooltip': (
+        '{width} × {height}, {scale}%\n'
+        'Ctrl+1: Original size\n'
+        'Ctrl+2: 2× size\n'
+        'Ctrl+0: Fit to image area (default)\n'
+        'Ctrl+=: Zoom in 10%\n'
+        'Ctrl+_: Zoom out 10% (until fit)\n'
+        'Mouse wheel: Zoom in/out 10%'
+    ),
     'response.key': 'Key',
     'response.value': 'Value',
     'response.save_title': 'Save Response Body',

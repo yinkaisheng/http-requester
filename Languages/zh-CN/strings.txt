@@ -51,6 +51,7 @@ response.raw=Raw
 response.json=JSON
 response.json_tree=JSON 树
 response.placeholder=响应内容将显示在这里
+response.image_tooltip={width} × {height}，{scale}%\nCtrl+1：原始比例\nCtrl+2：2 倍比例\nCtrl+0：适合图像容器窗口（默认显示）\nCtrl+=：放大 10%\nCtrl+_：缩小 10%（直到适合窗口）\n鼠标滚轮：放大/缩小 10%
 response.key=Key
 response.value=Value
 response.save_title=保存响应体

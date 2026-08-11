@@ -5,17 +5,19 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, Optional
 
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import QEvent, Qt, QTimer
 from PyQt5.QtGui import QClipboard, QPainter, QPixmap
 from PyQt5.QtWidgets import (
     QApplication,
     QButtonGroup,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QMenu,
     QPlainTextEdit,
     QPushButton,
     QRadioButton,
+    QScrollArea,
     QSplitter,
     QStackedWidget,
     QTreeWidget,
@@ -197,36 +199,264 @@ def _populate_json_tree(tree: QTreeWidget, parsed: Any) -> None:
         _append_json_children(item, parsed)
 
 
-class _ImagePreviewWidget(QWidget):
-    """Paint pixmap scaled-to-fit — no sizeHint impact on parent layout."""
+class _ImagePreviewCanvas(QWidget):
+    """Painted image canvas used inside :class:`_ImagePreviewWidget`."""
 
-    def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__(parent)
+    def __init__(self, preview: '_ImagePreviewWidget'):
+        super().__init__(preview)
+        self._preview = preview
         self._pixmap: Optional[QPixmap] = None
+        self._scaled_size = (0, 0)
+        self._drag_start = None
+        self._drag_scroll_start = None
+
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setCursor(Qt.OpenHandCursor)
+        self.setMouseTracking(True)
 
     def set_pixmap(self, pixmap: Optional[QPixmap]) -> None:
         self._pixmap = pixmap
+        self.update()
+
+    def set_scaled_size(self, width: int, height: int) -> None:
+        self._scaled_size = (width, height)
         self.update()
 
     def paintEvent(self, event) -> None:
         super().paintEvent(event)
         if self._pixmap is None:
             return
-        pm = self._pixmap
-        if pm.width() <= self.width() and pm.height() <= self.height():
-            pix = pm
-        else:
-            pix = pm.scaled(
-                self.width(), self.height(),
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation,
-            )
-        x = (self.width() - pix.width()) // 2
-        y = (self.height() - pix.height()) // 2
+        width, height = self._scaled_size
+        if width <= 0 or height <= 0:
+            return
+        x = (self.width() - width) // 2
+        y = (self.height() - height) // 2
         painter = QPainter(self)
-        painter.drawPixmap(x, y, pix)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        painter.drawPixmap(x, y, width, height, self._pixmap)
         painter.end()
 
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.LeftButton and self._pixmap is not None:
+            self.setFocus(Qt.MouseFocusReason)
+            # The canvas moves underneath the viewport as its scroll bars are
+            # updated.  A canvas-local position would therefore change during
+            # a drag and make the next offset jump back and forth.
+            self._drag_start = event.globalPos()
+            self._drag_scroll_start = (
+                self._preview.horizontalScrollBar().value(),
+                self._preview.verticalScrollBar().value(),
+            )
+            self.grabMouse()
+            self.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        if self._drag_start is not None and self._drag_scroll_start is not None:
+            offset = event.globalPos() - self._drag_start
+            self._preview.horizontalScrollBar().setValue(self._drag_scroll_start[0] - offset.x())
+            self._preview.verticalScrollBar().setValue(self._drag_scroll_start[1] - offset.y())
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() == Qt.LeftButton and self._drag_start is not None:
+            self._drag_start = None
+            self._drag_scroll_start = None
+            self.releaseMouse()
+            self.setCursor(Qt.OpenHandCursor)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event) -> None:
+        if self._preview.handle_key_press(event):
+            return
+        super().keyPressEvent(event)
+
+    def wheelEvent(self, event) -> None:
+        delta = event.angleDelta().y()
+        if delta and self._pixmap is not None:
+            self._preview.adjust_zoom(
+                self._preview._ZOOM_STEP if delta > 0 else -self._preview._ZOOM_STEP,
+                event.globalPos(),
+            )
+            event.accept()
+            return
+        super().wheelEvent(event)
+
+
+class _ImagePreviewWidget(QScrollArea):
+    """Focusable image viewer with keyboard zoom, scrollbars, and drag panning."""
+
+    _MIN_ZOOM = 0.5
+    _MAX_ZOOM = 2.0
+    _ZOOM_STEP = 0.1
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._pixmap: Optional[QPixmap] = None
+        self._zoom: Optional[float] = None  # None means fit-to-window.
+        self._canvas = _ImagePreviewCanvas(self)
+        self.setWidget(self._canvas)
+        self.setWidgetResizable(False)
+        self.setFrameShape(QFrame.NoFrame)
+        self.viewport().installEventFilter(self)
+        self._update_tooltip()
+
+    def set_pixmap(self, pixmap: Optional[QPixmap]) -> None:
+        self._pixmap = pixmap
+        self._zoom = None
+        self._canvas.set_pixmap(pixmap)
+        self._update_layout()
+        self._update_tooltip()
+
+    def retranslate_ui(self) -> None:
+        self._update_tooltip()
+
+    def refresh_display(self) -> None:
+        self._update_layout()
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched is self.viewport() and event.type() == QEvent.Resize:
+            QTimer.singleShot(0, self._update_layout)
+        return super().eventFilter(watched, event)
+
+    def _fit_scale(self) -> float:
+        if self._pixmap is None or self.viewport().width() <= 0 or self.viewport().height() <= 0:
+            return 1.0
+        return min(
+            1.0,
+            self.viewport().width() / self._pixmap.width(),
+            self.viewport().height() / self._pixmap.height(),
+        )
+
+    def _current_scale(self) -> float:
+        return self._fit_scale() if self._zoom is None else self._zoom
+
+    def _update_layout(self) -> None:
+        if self._pixmap is None:
+            self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self._canvas.resize(self.viewport().size())
+            self._canvas.set_scaled_size(0, 0)
+            return
+
+        scale = self._current_scale()
+        image_width = max(1, round(self._pixmap.width() * scale))
+        image_height = max(1, round(self._pixmap.height() * scale))
+        if self._image_fits_container(image_width, image_height):
+            self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        else:
+            self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        canvas_width = max(image_width, self.viewport().width())
+        canvas_height = max(image_height, self.viewport().height())
+        self._canvas.resize(canvas_width, canvas_height)
+        self._canvas.set_scaled_size(image_width, image_height)
+        self._update_tooltip()
+
+    def _update_tooltip(self) -> None:
+        if self._pixmap is None:
+            tooltip = ''
+        else:
+            tooltip = tr(
+                'response.image_tooltip',
+                width=self._pixmap.width(),
+                height=self._pixmap.height(),
+                scale=round(self._current_scale() * 100),
+            ).replace('\\n', '\n')
+        self.setToolTip(tooltip)
+        if hasattr(self, '_canvas'):
+            self._canvas.setToolTip(tooltip)
+
+    def _set_zoom(self, zoom: Optional[float], anchor_global_pos=None) -> None:
+        """Update the zoom while keeping the point below *anchor_global_pos* fixed."""
+        anchor_viewport_pos = None
+        image_position = None
+        old_scale = self._current_scale()
+        if self._pixmap is not None and anchor_global_pos is not None:
+            anchor_viewport_pos = self.viewport().mapFromGlobal(anchor_global_pos)
+            anchor_canvas_pos = self._canvas.mapFromGlobal(anchor_global_pos)
+            old_width, old_height = self._canvas._scaled_size
+            old_image_x = (self._canvas.width() - old_width) // 2
+            old_image_y = (self._canvas.height() - old_height) // 2
+            # Preserve the image coordinate, instead of the canvas coordinate:
+            # the canvas can gain or lose the empty centering margins.
+            image_position = (
+                (anchor_canvas_pos.x() - old_image_x) / old_scale,
+                (anchor_canvas_pos.y() - old_image_y) / old_scale,
+            )
+
+        self._zoom = zoom
+        self._update_layout()
+
+        if anchor_viewport_pos is not None and image_position is not None:
+            new_width, new_height = self._canvas._scaled_size
+            new_image_x = (self._canvas.width() - new_width) // 2
+            new_image_y = (self._canvas.height() - new_height) // 2
+            new_scale = self._current_scale()
+            target_x = round(new_image_x + image_position[0] * new_scale - anchor_viewport_pos.x())
+            target_y = round(new_image_y + image_position[1] * new_scale - anchor_viewport_pos.y())
+            self.horizontalScrollBar().setValue(target_x)
+            self.verticalScrollBar().setValue(target_y)
+
+    def _image_fits_container(self, width: int, height: int) -> bool:
+        return width <= self.viewport().width() and height <= self.viewport().height()
+
+    def _zoom_out(self, anchor_global_pos=None) -> None:
+        current_scale = self._current_scale()
+        image_width = round(self._pixmap.width() * current_scale)
+        image_height = round(self._pixmap.height() * current_scale)
+        # Keep the standard 50% minimum unless the image still overflows there.
+        if current_scale <= self._MIN_ZOOM and self._image_fits_container(image_width, image_height):
+            return
+
+        next_scale = round(current_scale - self._ZOOM_STEP, 2)
+        if next_scale < self._ZOOM_STEP:
+            self._set_zoom(None, anchor_global_pos)
+            return
+
+        next_width = round(self._pixmap.width() * next_scale)
+        next_height = round(self._pixmap.height() * next_scale)
+        if next_scale <= self._ZOOM_STEP and not self._image_fits_container(next_width, next_height):
+            self._set_zoom(None, anchor_global_pos)
+            return
+        self._set_zoom(next_scale, anchor_global_pos)
+
+    def adjust_zoom(self, delta: float, anchor_global_pos=None) -> None:
+        if delta < 0:
+            self._zoom_out(anchor_global_pos)
+            return
+        self._set_zoom(
+            min(self._MAX_ZOOM, max(self._MIN_ZOOM, self._current_scale() + delta)),
+            anchor_global_pos,
+        )
+
+    def handle_key_press(self, event) -> bool:
+        if self._pixmap is None:
+            return False
+        if not event.modifiers() & Qt.ControlModifier:
+            return False
+        key = event.key()
+        if key == Qt.Key_1:
+            self._set_zoom(1.0)
+        elif key == Qt.Key_2:
+            self._set_zoom(2.0)
+        elif key == Qt.Key_0:
+            self._set_zoom(None)
+        elif key in (Qt.Key_Equal, Qt.Key_Plus):
+            self.adjust_zoom(self._ZOOM_STEP)
+        elif key in (Qt.Key_Minus, Qt.Key_Underscore):
+            self.adjust_zoom(-self._ZOOM_STEP)
+        else:
+            return False
+        event.accept()
+        return True
 
 class ResponseBodyPanel(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
@@ -325,6 +555,7 @@ class ResponseBodyPanel(QWidget):
         self.save_raw_btn.setText(tr('response.save_raw'))
         self.text_edit.setPlaceholderText(tr('response.placeholder'))
         self.json_tree.setHeaderLabels([tr('response.key'), tr('response.value')])
+        self._image_page.retranslate_ui()
 
     def _has_body(self) -> bool:
         """Whether there is response content to save."""
@@ -609,12 +840,11 @@ class ResponseBodyPanel(QWidget):
         if pixmap.loadFromData(self._raw_bytes):
             self._original_pixmap = pixmap
             self._image_page.set_pixmap(pixmap)
-            self._image_page.setToolTip(f'{pixmap.width()} × {pixmap.height()}')
 
     def _update_image_display(self) -> None:
         """Called when switching to the image page — triggers a repaint."""
         if self._original_pixmap is not None:
-            self._image_page.update()
+            self._image_page.refresh_display()
 
     def _tree_item_at_pos(self, pos) -> Optional[QTreeWidgetItem]:
         item = self.json_tree.itemAt(pos)
