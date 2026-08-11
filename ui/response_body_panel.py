@@ -31,6 +31,7 @@ from ui.dialog_i18n import get_save_file_name, message_warning
 from ui.headers_editor import (
     _compact_action_button,
     add_section_header_widget,
+    apply_section_header_row_height,
     configure_section_header_layout,
 )
 from ui.notifications import show_system_tip
@@ -313,6 +314,7 @@ class ResponseBodyPanel(QWidget):
             add_section_header_widget(header_layout, radio)
         add_section_header_widget(header_layout, self.save_raw_btn)
         header_layout.addStretch()
+        apply_section_header_row_height(row)
         return row
 
     def retranslate_ui(self) -> None:

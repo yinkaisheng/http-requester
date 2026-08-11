@@ -27,6 +27,7 @@ from models.http_models import BodyType, FormField
 from ui.headers_editor import (
     TableEditDelegate,
     _compact_action_button,
+    apply_section_header_row_height,
     _set_compact_table_header,
     _table_row_height,
     add_section_header_widget,
@@ -115,6 +116,7 @@ class BodyEditor(QWidget):
         ):
             add_section_header_widget(header_layout, radio)
         header_layout.addStretch()
+        apply_section_header_row_height(row)
         return row
 
     def _init_text_page(self) -> None:
