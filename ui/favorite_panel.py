@@ -488,6 +488,7 @@ class FavoritePanel(QWidget):
         self._filter_edit.setPlaceholderText(tr('favorites.filter_placeholder'))
         self._filter_edit.setClearButtonEnabled(False)
         self._filter_edit.textChanged.connect(self._on_filter_text_changed)
+        self._filter_edit.installEventFilter(self)
         filter_layout.addWidget(self._filter_edit, 0, Qt.AlignVCenter)
 
         self._clear_btn = QPushButton('×')
@@ -516,6 +517,17 @@ class FavoritePanel(QWidget):
         tree_font.setPixelSize(appearance.ui_font_size_px)
         self.tree.setFont(tree_font)
         layout.addWidget(self.tree, 1)
+
+    def eventFilter(self, obj, event) -> bool:
+        if (
+            obj is self._filter_edit
+            and event.type() == QEvent.KeyPress
+            and event.key() == Qt.Key_Escape
+        ):
+            self._clear_filter()
+            event.accept()
+            return True
+        return super().eventFilter(obj, event)
 
     # ------------------------------------------------------------------
     #  Load / rebuild

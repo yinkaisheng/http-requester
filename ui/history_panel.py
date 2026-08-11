@@ -118,6 +118,7 @@ class HistoryPanel(QWidget):
         self._filter_edit.setPlaceholderText(tr('history.filter_placeholder'))
         self._filter_edit.setClearButtonEnabled(False)
         self._filter_edit.textChanged.connect(self._filter_changed)
+        self._filter_edit.installEventFilter(self)
         title_layout.addWidget(self._filter_edit, 0, Qt.AlignVCenter)
 
         self._clear_filter_btn = QPushButton('×') # not x
@@ -144,7 +145,16 @@ class HistoryPanel(QWidget):
             widget.delete_btn.setToolTip(tr('history.delete_tooltip'))
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
-        if obj is self.list_widget.viewport() and event.type() == QEvent.Resize:
+        if (
+            obj is self._filter_edit
+            and event.type() == QEvent.KeyPress
+            and event.key() == Qt.Key_Escape
+        ):
+            self._clear_filter()
+            event.accept()
+            return True
+        list_widget = getattr(self, 'list_widget', None)
+        if list_widget is not None and obj is list_widget.viewport() and event.type() == QEvent.Resize:
             self._refresh_item_elision()
         return super().eventFilter(obj, event)
 
