@@ -548,6 +548,15 @@ class RequestTab(QWidget):
         """Mark tab closed so in-flight HTTP callbacks are ignored."""
         self._closed = True
 
+    def is_request_running(self) -> bool:
+        return self._active_task_id is not None
+
+    def send_request(self) -> None:
+        """Send the current request (same as clicking Send)."""
+        if self._closed:
+            return
+        self._on_send_clicked()
+
     def _on_send_clicked(self) -> None:
         req = self.collect_request()
         if req.body_type == BodyType.JSON and req.body_text.strip():

@@ -152,6 +152,7 @@ class MainWindow(QMainWindow):
         self.history_panel.records_bulk_deleted.connect(self.request_tabs.close_record_tabs)
         self.history_panel.record_renamed.connect(self._on_record_renamed)
         self.favorite_panel.request_selected.connect(self._on_favorite_request_selected)
+        self.favorite_panel.request_run_selected.connect(self._on_favorite_request_run_selected)
         self.favorite_panel.favorites_changed.connect(self._schedule_session_save)
         self.request_tabs.record_renamed.connect(self._on_record_renamed)
         self.request_tabs.record_saved.connect(self._on_record_saved)
@@ -333,3 +334,7 @@ class MainWindow(QMainWindow):
     def _on_favorite_request_selected(self, request: HttpRequest, name: str) -> None:
         record = HistoryRecord(name=name, request=request)
         self.request_tabs.open_record(record)
+
+    def _on_favorite_request_run_selected(self, request: HttpRequest, name: str) -> None:
+        record = HistoryRecord(name=name, request=request)
+        self.request_tabs.open_record(record, auto_send=True)

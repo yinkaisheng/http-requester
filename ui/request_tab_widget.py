@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from PyQt5.QtCore import Qt, pyqtSignal, QEvent
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QEvent
 from PyQt5.QtGui import QFontMetrics, QMouseEvent
 from PyQt5.QtWidgets import QMenu, QPushButton, QTabBar, QTabWidget, QWidget
 
@@ -117,11 +117,14 @@ class RequestTabWidget(QTabWidget):
                 self._close_tab_at_index(index)
                 return
 
-    def open_record(self, record: HistoryRecord) -> None:
+    def open_record(self, record: HistoryRecord, *, auto_send: bool = False) -> None:
         if record.id in self._record_tab_map:
             index = self._record_tab_map[record.id]
             if 0 <= index < self.count():
                 self.setCurrentIndex(index)
+                tab = self.widget(index)
+                if auto_send and isinstance(tab, RequestTab):
+                    QTimer.singleShot(0, tab.send_request)
                 return
             del self._record_tab_map[record.id]
 
@@ -129,6 +132,8 @@ class RequestTabWidget(QTabWidget):
         index = self.addTab(tab, tab.tab_title())
         self._record_tab_map[record.id] = index
         self.setCurrentIndex(index)
+        if auto_send:
+            QTimer.singleShot(0, tab.send_request)
 
     def new_request(self) -> RequestTab:
         tab = self._create_tab()
@@ -204,6 +209,9 @@ class RequestTabWidget(QTabWidget):
         if record_id in self._record_tab_map:
             index = self._record_tab_map[record_id]
             if 0 <= index < self.count():
+                widget = self.widget(index)
+                if isinstance(widget, RequestTab) and widget.is_request_running():
+                    return
                 self._close_tab_at_index(index)
                 return
         self._ensure_at_least_one_tab()
@@ -215,7 +223,7 @@ class RequestTabWidget(QTabWidget):
             widget = self.widget(i)
             if isinstance(widget, RequestTab):
                 rid = widget.get_record_id()
-                if rid and rid in id_set:
+                if rid and rid in id_set and not widget.is_request_running():
                     indices.append(i)
         for index in sorted(indices, reverse=True):
             self._close_tab_at_index(index)

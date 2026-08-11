@@ -456,6 +456,7 @@ class FavoritePanel(QWidget):
     """
 
     request_selected = pyqtSignal(HttpRequest, str)  # request, name
+    request_run_selected = pyqtSignal(HttpRequest, str)  # request, name
     favorites_changed = pyqtSignal()
 
     def __init__(
@@ -656,10 +657,17 @@ class FavoritePanel(QWidget):
         self.favorites_changed.emit()
 
     def _on_item_double_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
+        self._open_favorite_item(item, run=False)
+
+    def _open_favorite_item(self, item: QTreeWidgetItem, *, run: bool) -> None:
         if item.data(0, ROLE_TYPE) != ITEM_TYPE_FAVORITE:
             return
         fav = self._find_fav_by_tree(item)
-        if fav is not None and fav.request is not None:
+        if fav is None or fav.request is None:
+            return
+        if run:
+            self.request_run_selected.emit(fav.request, fav.name)
+        else:
             self.request_selected.emit(fav.request, fav.name)
 
     # ------------------------------------------------------------------
@@ -709,6 +717,7 @@ class FavoritePanel(QWidget):
             menu.addSeparator()
         else:
             menu.addAction(tr('favorites.open'))
+            menu.addAction(tr('favorites.open_and_run'))
             menu.addAction(tr('favorites.update_from_current'))
             menu.addSeparator()
         menu.addAction(tr('favorites.rename'))
@@ -762,7 +771,9 @@ class FavoritePanel(QWidget):
                 self._delete_item(item, confirm=False)
         else:
             if action_text == tr('favorites.open'):
-                self._on_item_double_clicked(item, 0)
+                self._open_favorite_item(item, run=False)
+            elif action_text == tr('favorites.open_and_run'):
+                self._open_favorite_item(item, run=True)
             elif action_text == tr('favorites.update_from_current'):
                 self._update_request(item)
             elif action_text == tr('favorites.rename'):

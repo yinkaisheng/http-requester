@@ -171,6 +171,7 @@ favorites.delete=删除
 favorites.cut=剪切
 favorites.paste=粘贴
 favorites.open=打开
+favorites.open_and_run=打开并执行
 favorites.import_postman=导入 Postman 集合...
 favorites.confirm_delete=删除
 favorites.confirm_delete_body=确定要删除 "{name}" 吗？

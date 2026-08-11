@@ -187,6 +187,7 @@ BUILTIN_STRINGS: Dict[str, str] = {
     'favorites.cut': 'Cut',
     'favorites.paste': 'Paste',
     'favorites.open': 'Open',
+    'favorites.open_and_run': 'Open and Run',
     'favorites.import_postman': 'Import Postman Collection...',
     'favorites.confirm_delete': 'Delete',
     'favorites.confirm_delete_body': 'Are you sure you want to delete "{name}"?',
