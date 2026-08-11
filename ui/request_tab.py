@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QMessageBox,
     QSplitter,
+    QSplitterHandle,
     QTableWidget,
     QVBoxLayout,
     QWidget,
@@ -61,6 +62,28 @@ MSG_HTTP_DONE = 1
 DEFAULT_CONTENT_RATIO = 0.5
 DEFAULT_PANEL_RATIO = 0.25
 STATUS_DISPLAY_MAX_LENGTH = 72
+
+
+class _ContentSplitterHandle(QSplitterHandle):
+    """Horizontal splitter handle that restores equal panel widths on double-click."""
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        splitter = self.parent()
+        splitter.reset_to_equal_widths()
+        splitter.equal_widths_requested.emit()
+        event.accept()
+
+
+class _ContentSplitter(QSplitter):
+    equal_widths_requested = pyqtSignal()
+
+    def createHandle(self) -> QSplitterHandle:
+        return _ContentSplitterHandle(self.orientation(), self)
+
+    def reset_to_equal_widths(self) -> None:
+        total_width = sum(self.sizes())
+        left_width = total_width // 2
+        self.setSizes([left_width, total_width - left_width])
 
 
 def _status_code_style_id(status_code: int) -> str:
@@ -195,7 +218,7 @@ class RequestTab(QWidget):
         toolbar.addWidget(self.pwsh_btn, 0, Qt.AlignVCenter)
         layout.addLayout(toolbar)
 
-        self.content_splitter = QSplitter(Qt.Horizontal)
+        self.content_splitter = _ContentSplitter(Qt.Horizontal)
         self.content_splitter.setObjectName('contentSplitter')
         self.content_splitter.setHandleWidth(4)
 
@@ -255,6 +278,7 @@ class RequestTab(QWidget):
         self.content_splitter.addWidget(self.right_splitter)
         self.content_splitter.setStretchFactor(0, 1)
         self.content_splitter.setStretchFactor(1, 1)
+        self.content_splitter.equal_widths_requested.connect(self._reset_content_splitter)
         for splitter in (self.content_splitter, self.left_splitter, self.right_splitter):
             splitter.splitterMoved.connect(self._on_splitter_moved)
         layout.addWidget(self.content_splitter, 1)
@@ -280,6 +304,9 @@ class RequestTab(QWidget):
             self._apply_splitter_sizes_now(self._splitter_ratios)
         else:
             self.apply_default_splitter_sizes()
+
+    def _reset_content_splitter(self) -> None:
+        self._splitter_ratios = self._ratios_from_widgets()
 
     def _on_splitter_moved(self, _pos: int, _index: int) -> None:
         if not self.isVisible():
