@@ -585,6 +585,7 @@ class RequestTab(QWidget):
 
     def _execute_send(self, req: HttpRequest) -> None:
         self.send_btn.setEnabled(False)
+        self._clear_response_content()
         self._set_status_text(tr('request.sending'))
         self._set_status_style('statusPending')
         try:
@@ -620,9 +621,7 @@ class RequestTab(QWidget):
         if resp.error and not resp.status_code:
             self._set_status_text(tr('request.error_prefix', message=resp.error))
             self._set_status_style('statusError')
-            self.response_headers_table.setRowCount(0)
-            self.response_body_panel.clear()
-            self._cached_response = None
+            self._clear_response_content()
             return
 
         if resp.error:
@@ -652,12 +651,15 @@ class RequestTab(QWidget):
         if not resp.error or resp.status_code:
             self._cached_response = _response_snapshot(resp)
 
-    def _clear_response_display(self) -> None:
-        self._set_status_text(tr('request.waiting'))
-        self._set_status_style('statusPending')
+    def _clear_response_content(self) -> None:
         self.response_headers_table.setRowCount(0)
         self.response_body_panel.clear()
         self._cached_response = None
+
+    def _clear_response_display(self) -> None:
+        self._set_status_text(tr('request.waiting'))
+        self._set_status_style('statusPending')
+        self._clear_response_content()
 
     def _apply_saved_response(
         self,
