@@ -412,7 +412,8 @@ class _FavoriteTreeWidget(QTreeWidget):
             moved = self.takeTopLevelItem(item_idx)
             if moved is None:
                 moved = item
-            if item_parent is target_parent or (target_parent is None and item_idx < target_idx):
+            # Removing a root shifts the target only when it is a later root.
+            if target_parent is None and item_idx < target_idx:
                 target_idx -= 1
 
         # Insert at computed position
